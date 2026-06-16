@@ -1,69 +1,37 @@
 # ProofFlow
 
-React + Node web app for Railway. Users sign in, submit two photos from an iPhone browser, and supervisors review all submissions by user and date.
+Static React app for GitHub Pages. Users enter their details, take two photos, generate one finished HTML submission file, and open an email draft for sending it.
 
-Railway is a good fit for this MVP because the web app, Node API, and PostgreSQL database can run in one project. Please check current Railway pricing before production use because free/trial rules can change. For photo storage, use a Railway Volume or object storage.
+GitHub Pages cannot run a backend, store a database, or attach files to email automatically. The app therefore creates the finished file in the browser. The user downloads that file and attaches it to the opened email.
+
+## Set Recipient
+
+Edit the recipient in `src/App.jsx`:
+
+```js
+const RECIPIENT_EMAIL = "recipient@example.invalid";
+```
 
 ## Local Start
 
 ```bash
 npm install
-cp .env.example .env
-npm run local
+npm run client:dev
 ```
 
-Open: `http://127.0.0.1:3000`
+Open the Vite URL shown in the terminal.
 
-If `DATABASE_URL` is empty, the app starts in local demo mode and stores data in `data/local-db.json`. On Railway, set `DATABASE_URL` and the same code reads/writes PostgreSQL.
-
-## Test Accounts
-
-These accounts are seeded from ENV on every start:
-
-- Admin: `ADMIN_EMAIL` / `ADMIN_PASSWORD`
-- User: `TEST_USER_EMAIL` / `TEST_USER_PASSWORD`
-- Extra admin: `EXTRA_ADMIN_EMAIL` / `EXTRA_ADMIN_PASSWORD`
-- Extra user: `EXTRA_USER_EMAIL` / `EXTRA_USER_PASSWORD`
-
-Defaults:
-
-- Admin: `admin@example.invalid` / `admin`
-- Extra admin: `supervisor@example.invalid` / `supervisor123`
-- User: `user@example.invalid` / `user`
-- Extra user: `driver@example.invalid` / `driver123`
-
-## Railway
-
-1. Neues Railway-Projekt erstellen.
-2. PostgreSQL-Service hinzufuegen.
-3. Dieses Repo deployen.
-4. Optional ein Volume nach `/data` mounten, damit hochgeladene Bilder persistent gespeichert werden.
-5. ENV setzen:
+## Build For GitHub Pages
 
 ```bash
-DATABASE_URL=...
-SESSION_SECRET=...
-ADMIN_EMAIL=admin@example.invalid
-ADMIN_PASSWORD=...
-EXTRA_ADMIN_EMAIL=supervisor@example.invalid
-EXTRA_ADMIN_PASSWORD=...
-TEST_USER_EMAIL=test@example.invalid
-TEST_USER_PASSWORD=...
-EXTRA_USER_EMAIL=driver@example.invalid
-EXTRA_USER_PASSWORD=...
-DATA_DIR=/data
+npm run build:pages
 ```
 
-Wenn kein Volume genutzt wird, speichert Railway Dateien nur ephemer. Fuer echte Nutzung also unbedingt Volume/Object Storage oder S3-kompatiblen Speicher verwenden.
+Upload or publish the generated `dist` folder with GitHub Pages.
 
-Railway Start Command:
+## GitHub Pages Notes
 
-```bash
-npm run start
-```
-
-Railway Build Command:
-
-```bash
-npm install && npm run build
-```
+- No login is included because GitHub Pages is static.
+- No database is included because there is no server process.
+- Photos are embedded into the generated HTML file.
+- Email opens with `mailto:`. The downloaded file still needs to be attached manually.
