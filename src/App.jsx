@@ -44,22 +44,18 @@ function App() {
   );
   const emailSubject = buildEmailSubject(reportData);
 
-  function createAttachmentFiles(timestamp) {
+  async function createAttachmentFiles(timestamp) {
     if (!canCreate) {
       return null;
     }
 
     const currentReportData = { ...reportData, dateTime: timestamp };
-    const reportText = buildReportText(currentReportData);
     const fileStamp = formatFileDate(timestamp);
-    const reportName = `proofflow-report-${safeFilePart(tripType)}-${safeFilePart(name)}-${fileStamp}.txt`;
+    const reportName = `alcohol-check-${safeFilePart(tripType)}-${safeFilePart(name)}-${fileStamp}.pdf`;
+    const reportPdf = await buildReportPdf(currentReportData, personPhoto, bacPhoto, reportName);
     return {
       data: currentReportData,
-      files: [
-        new File([reportText], reportName, { type: "text/plain" }),
-        renamePhotoFile(personPhoto, `person-photo-${fileStamp}`),
-        renamePhotoFile(bacPhoto, `bac-meter-photo-${fileStamp}`)
-      ]
+      files: [reportPdf]
     };
   }
 
@@ -74,7 +70,7 @@ function App() {
     setStatus("");
 
     const timestamp = new Date();
-    const packageData = createAttachmentFiles(timestamp);
+    const packageData = await createAttachmentFiles(timestamp);
     if (!packageData) return;
 
     setCreatedAt(timestamp);
@@ -267,7 +263,7 @@ function App() {
 
         <section className="notice">
           <Mail size={20} />
-          <p>「メールを送信」を押すと、レポートと2枚の写真を添付した状態でiPhoneの共有画面が開きます。メールアプリを選んで送信してください。</p>
+          <p>「メールを送信」を押すと、入力内容と2枚の写真を含むPDFを添付した状態でiPhoneの共有画面が開きます。メールアプリを選んで送信してください。</p>
         </section>
       </section>
     </main>
@@ -337,7 +333,7 @@ function useObjectUrl(file) {
 }
 
 function buildEmailSubject(data) {
-  return `アルコールチェック（${getTripTypeLabel(data.tripType)}） - ${data.name || "氏名未入力"} - ${formatFileDate(data.dateTime)}`;
+  return `アルコールチェック報告（${getTripTypeLabel(data.tripType)}） - ${data.name || "氏名未入力"} - ${formatFileDate(data.dateTime)}`;
 }
 
 function buildEmailBody(data) {
@@ -353,13 +349,197 @@ function buildEmailBody(data) {
     `BAC値: ${data.bacValue}`,
     "",
     "添付ファイル:",
-    `本人写真: ${data.personPhotoName}`,
-    `アルコール検知器の写真: ${data.bacPhotoName}`,
+    "アルコールチェック報告書PDF（入力内容と2枚の写真を含む）",
     "",
     data.note ? `備考: ${data.note}` : "備考: -",
     "",
-    "レポートファイルと2枚の写真が添付されています。"
+    "PDFレポートに内容と2枚の写真が含まれています。"
   ].join("\n");
+}
+
+async function buildReportPdf(data, personPhoto, bacPhoto, fileName) {
+  const pageWidth = 1240;
+  const pageHeight = 1754;
+  const canvas = document.createElement("canvas");
+  canvas.width = pageWidth;
+  canvas.height = pageHeight;
+
+  const context = canvas.getContext("2d");
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, pageWidth, pageHeight);
+
+  context.fillStyle = "#0f766e";
+  context.fillRect(0, 0, pageWidth, 180);
+  context.fillStyle = "#ffffff";
+  context.font = "700 58px -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif";
+  context.fillText("アルコールチェック報告書", 72, 92);
+  context.font = "400 30px -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif";
+  context.fillText("Alcohol Check Report", 76, 142);
+
+  const rows = [
+    ["宛先", RECIPIENT_EMAIL],
+    ["種別", getTripTypeLabel(data.tripType)],
+    ["氏名", data.name || "-"],
+    ["日付", formatDisplayDate(data.dateTime)],
+    ["時刻", formatDisplayTime(data.dateTime)],
+    ["BAC値", data.bacValue || "-"],
+    ["備考", data.note || "-"]
+  ];
+
+  let y = 250;
+  context.fillStyle = "#172026";
+  context.font = "700 34px -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif";
+  context.fillText("確認内容", 72, y);
+  y += 38;
+
+  rows.forEach(([label, value]) => {
+    context.fillStyle = "#eef3f2";
+    context.fillRect(72, y, 1096, 62);
+    context.fillStyle = "#52676b";
+    context.font = "700 24px -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif";
+    context.fillText(label, 96, y + 40);
+    context.fillStyle = "#172026";
+    context.font = "500 25px -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif";
+    drawWrappedText(context, String(value), 270, y + 40, 860, 30, 2);
+    y += 72;
+  });
+
+  y += 36;
+  context.fillStyle = "#172026";
+  context.font = "700 34px -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif";
+  context.fillText("写真", 72, y);
+  y += 34;
+
+  const [personImage, bacImage] = await Promise.all([loadImageFromFile(personPhoto), loadImageFromFile(bacPhoto)]);
+  drawPhotoBlock(context, personImage, "本人写真", 72, y, 520, 390);
+  drawPhotoBlock(context, bacImage, "アルコール検知器の写真", 648, y, 520, 390);
+
+  context.fillStyle = "#66777d";
+  context.font = "400 20px -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif";
+  context.fillText("このPDFには入力内容と2枚の写真が含まれています。", 72, 1648);
+
+  const jpegBytes = await canvasToJpegBytes(canvas, 0.72);
+  const pdfBytes = createSingleImagePdf(jpegBytes, pageWidth, pageHeight);
+  return new File([pdfBytes], fileName, { type: "application/pdf" });
+}
+
+function drawPhotoBlock(context, image, title, x, y, width, height) {
+  context.fillStyle = "#f7faf9";
+  context.fillRect(x, y, width, height);
+  context.strokeStyle = "#d6e0de";
+  context.lineWidth = 2;
+  context.strokeRect(x, y, width, height);
+
+  context.fillStyle = "#172026";
+  context.font = "700 25px -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif";
+  context.fillText(title, x + 18, y + 38);
+
+  const imageBox = { x: x + 18, y: y + 58, width: width - 36, height: height - 78 };
+  const scale = Math.min(imageBox.width / image.width, imageBox.height / image.height);
+  const drawWidth = image.width * scale;
+  const drawHeight = image.height * scale;
+  const drawX = imageBox.x + (imageBox.width - drawWidth) / 2;
+  const drawY = imageBox.y + (imageBox.height - drawHeight) / 2;
+  context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+}
+
+function drawWrappedText(context, text, x, y, maxWidth, lineHeight, maxLines) {
+  const chars = Array.from(text);
+  let line = "";
+  let lineCount = 0;
+  chars.forEach((char, index) => {
+    const testLine = line + char;
+    const isLast = index === chars.length - 1;
+    if (context.measureText(testLine).width > maxWidth && line) {
+      context.fillText(line, x, y + lineCount * lineHeight);
+      line = char;
+      lineCount += 1;
+    } else {
+      line = testLine;
+    }
+    if (isLast && line && lineCount < maxLines) {
+      context.fillText(line, x, y + lineCount * lineHeight);
+    }
+  });
+}
+
+function loadImageFromFile(file) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    const url = URL.createObjectURL(file);
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Image could not be loaded"));
+    };
+    image.src = url;
+  });
+}
+
+function canvasToJpegBytes(canvas, quality) {
+  return new Promise((resolve) => {
+    canvas.toBlob(
+      (blob) => {
+        blob.arrayBuffer().then((buffer) => resolve(new Uint8Array(buffer)));
+      },
+      "image/jpeg",
+      quality
+    );
+  });
+}
+
+function createSingleImagePdf(jpegBytes, imageWidth, imageHeight) {
+  const pageWidth = 595;
+  const pageHeight = 842;
+  const content = `q\n${pageWidth} 0 0 ${pageHeight} 0 0 cm\n/Im0 Do\nQ\n`;
+  const objects = [
+    ascii("<< /Type /Catalog /Pages 2 0 R >>"),
+    ascii("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+    ascii(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>`),
+    concatBytes([
+      ascii(`<< /Type /XObject /Subtype /Image /Width ${imageWidth} /Height ${imageHeight} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpegBytes.length} >>\nstream\n`),
+      jpegBytes,
+      ascii("\nendstream")
+    ]),
+    ascii(`<< /Length ${content.length} >>\nstream\n${content}endstream`)
+  ];
+
+  const chunks = [ascii("%PDF-1.4\n")];
+  const offsets = [0];
+  objects.forEach((object, index) => {
+    offsets.push(totalLength(chunks));
+    chunks.push(ascii(`${index + 1} 0 obj\n`), object, ascii("\nendobj\n"));
+  });
+
+  const xrefOffset = totalLength(chunks);
+  chunks.push(ascii(`xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`));
+  offsets.slice(1).forEach((offset) => {
+    chunks.push(ascii(`${String(offset).padStart(10, "0")} 00000 n \n`));
+  });
+  chunks.push(ascii(`trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`));
+
+  return concatBytes(chunks);
+}
+
+function ascii(value) {
+  return new TextEncoder().encode(value);
+}
+
+function concatBytes(chunks) {
+  const output = new Uint8Array(totalLength(chunks));
+  let offset = 0;
+  chunks.forEach((chunk) => {
+    output.set(chunk, offset);
+    offset += chunk.length;
+  });
+  return output;
+}
+
+function totalLength(chunks) {
+  return chunks.reduce((sum, chunk) => sum + chunk.length, 0);
 }
 
 function buildReportText(data) {
