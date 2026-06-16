@@ -130,7 +130,7 @@ function App() {
 
   return (
     <main className="app-shell">
-      <section className="page mobile-page" ref={pageRef}>
+      <section className={`page mobile-page ${currentStep === "details" ? "is-details" : "is-compact-flow"}`} ref={pageRef}>
         <header className="hero compact-hero">
           <div className="hero-copy">
             <div className="brand-line">
