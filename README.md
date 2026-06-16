@@ -1,6 +1,6 @@
 # ProofFlow
 
-Static mobile React app for GitHub Pages. Users enter an arrival/departure check, name, BAC value, take two photos, generate a lightweight text report, and open an email draft for App Maintainer.
+Static mobile React app for GitHub Pages. Users enter an arrival/departure check, name, BAC value, take two photos, generate a lightweight text report, and open a prepared email draft.
 
 GitHub Pages cannot run a backend, store a database, or silently send email attachments. The app therefore creates the report file in the browser and prepares the email subject/body with all structured data.
 

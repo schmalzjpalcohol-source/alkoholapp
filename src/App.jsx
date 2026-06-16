@@ -1,4 +1,4 @@
-import { Camera, CheckCircle2, Download, Mail, RotateCcw, Share2, ShieldCheck } from "lucide-react";
+import { Camera, CheckCircle2, Download, Gauge, Mail, RotateCcw, Share2, ShieldCheck } from "lucide-react";
 import { useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
@@ -54,25 +54,32 @@ function App() {
 
     if (reportFile?.url) URL.revokeObjectURL(reportFile.url);
     setCreatedAt(timestamp);
-    setReportFile({ file, name: fileName, text: reportText, url });
+    setReportFile({
+      file,
+      files: [file, renamePhotoFile(personPhoto, `person-photo-${formatFileDate(timestamp)}`), renamePhotoFile(bacPhoto, `bac-meter-photo-${formatFileDate(timestamp)}`)],
+      name: fileName,
+      text: reportText,
+      url
+    });
     downloadUrl(url, fileName);
-    setStatus("Report file created and downloaded.");
+    setStatus("Report file created. Share the report together with both photos.");
     setBusy(false);
   }
 
   async function shareReport() {
-    const file = reportFile?.file;
-    if (!file) return;
+    const files = reportFile?.files || [];
+    if (files.length === 0) return;
 
-    if (navigator.canShare?.({ files: [file] }) && navigator.share) {
+    if (navigator.canShare?.({ files }) && navigator.share) {
       await navigator.share({
-        files: [file],
+        files,
         title: buildEmailSubject(reportData),
         text: buildEmailBody(reportData)
       });
       return;
     }
 
+    setStatus("Your browser cannot attach files automatically. Open email and attach the report plus both photos.");
     openEmailDraft();
   }
 
@@ -106,7 +113,18 @@ function App() {
               <span>ProofFlow</span>
             </div>
             <h1>Alcohol Check</h1>
-            <p>Submit arrival or departure proof to App Maintainer.</p>
+            <p>Submit an arrival or departure alcohol check.</p>
+          </div>
+          <div className="hero-visual" aria-hidden="true">
+            <div className="meter-card">
+              <Gauge size={44} />
+              <span>0.00</span>
+              <small>BAC</small>
+            </div>
+            <div className="photo-card">
+              <Camera size={28} />
+              <span>2 photos</span>
+            </div>
           </div>
         </header>
 
@@ -201,11 +219,11 @@ function App() {
               <div className="action-grid">
                 <button className="primary-button" disabled={!canCreate || busy} type="submit">
                   <Download size={20} />
-                  {busy ? "Creating..." : "Create report file"}
+                  {busy ? "Creating..." : "Create report"}
                 </button>
                 <button className="secondary-button" disabled={!reportFile} onClick={shareReport} type="button">
                   <Share2 size={20} />
-                  Share file
+                  Share report + photos
                 </button>
                 <button className="secondary-button" onClick={openEmailDraft} type="button">
                   <Mail size={20} />
@@ -230,7 +248,7 @@ function App() {
 
         <section className="notice">
           <Mail size={20} />
-          <p>The email subject and body are prepared automatically. Static GitHub Pages cannot silently attach and send files without an email app.</p>
+          <p>Use Share report + photos on mobile to send the report and both image files. Email text and subject are prepared automatically.</p>
         </section>
       </section>
     </main>
@@ -305,7 +323,7 @@ function buildEmailSubject(data) {
 
 function buildEmailBody(data) {
   return [
-    "Hello App Maintainer,",
+    "Hello,",
     "",
     "Please find the alcohol check details below.",
     "",
@@ -315,13 +333,13 @@ function buildEmailBody(data) {
     `Time: ${formatDisplayTime(data.dateTime)}`,
     `BAC value: ${data.bacValue}`,
     "",
-    "Photo files:",
+    "Attached photo files:",
     `Person photo: ${data.personPhotoName}`,
     `BAC meter photo: ${data.bacPhotoName}`,
     "",
     data.note ? `Notes: ${data.note}` : "Notes: -",
     "",
-    "The lightweight report file was created by ProofFlow."
+    "Please make sure the report file and both photos are attached."
   ].join("\n");
 }
 
@@ -355,6 +373,22 @@ function downloadUrl(url, fileName) {
   document.body.append(link);
   link.click();
   link.remove();
+}
+
+function renamePhotoFile(file, baseName) {
+  const extension = getFileExtension(file.name) || imageExtensionFromType(file.type);
+  return new File([file], `${baseName}${extension}`, { type: file.type || "image/jpeg" });
+}
+
+function getFileExtension(fileName) {
+  const match = String(fileName).match(/\.[a-z0-9]+$/i);
+  return match ? match[0].toLowerCase() : "";
+}
+
+function imageExtensionFromType(type) {
+  if (type === "image/png") return ".png";
+  if (type === "image/webp") return ".webp";
+  return ".jpg";
 }
 
 function safeFilePart(value) {
