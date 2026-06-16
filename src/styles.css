@@ -1163,28 +1163,27 @@ textarea:focus {
 }
 
 .is-compact-flow .compact-hero {
-  min-height: 132px;
-  padding: 18px;
+  min-height: 76px;
+  padding: 12px 14px;
 }
 
 .is-compact-flow .brand-line {
-  font-size: 15px;
-  margin-bottom: 8px;
+  font-size: 13px;
+  margin-bottom: 5px;
 }
 
 .is-compact-flow .brand-line svg {
-  height: 21px;
-  width: 21px;
+  height: 18px;
+  width: 18px;
 }
 
 .is-compact-flow .hero h1 {
-  font-size: 34px;
-  margin-bottom: 6px;
+  font-size: 25px;
+  margin-bottom: 0;
 }
 
 .is-compact-flow .hero p {
-  font-size: 15px;
-  line-height: 1.3;
+  display: none;
 }
 
 .is-compact-flow .hero-visual {
@@ -1192,32 +1191,37 @@ textarea:focus {
 }
 
 .is-compact-flow .submission-panel {
-  gap: 12px;
-  margin-top: 10px;
-  padding: 12px;
+  gap: 9px;
+  margin-top: 8px;
+  padding: 9px;
 }
 
 .is-compact-flow .flow-progress {
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .is-compact-flow .form-step,
 .is-compact-flow .camera-step,
 .is-compact-flow .review-screen {
-  gap: 10px;
+  gap: 8px;
 }
 
 .is-compact-flow .compact-camera {
-  padding: 10px;
+  padding: 8px;
 }
 
 .is-compact-flow .camera-step-title h2 {
-  font-size: 18px;
+  font-size: 16px;
+}
+
+.is-compact-flow .camera-step-title span {
+  font-size: 11px;
+  padding: 4px 8px;
 }
 
 .is-compact-flow .camera-preview {
-  aspect-ratio: 16 / 7;
-  max-height: 112px;
+  aspect-ratio: 16 / 5;
+  max-height: 78px;
 }
 
 .is-compact-flow .camera-preview svg {
@@ -1226,47 +1230,55 @@ textarea:focus {
 }
 
 .is-compact-flow .secondary-camera {
-  min-height: 52px;
+  min-height: 44px;
 }
 
 .is-compact-flow .camera-button span {
-  font-size: 20px;
+  font-size: 17px;
 }
 
 .is-compact-flow .big-next,
 .is-compact-flow .review-screen .primary-button {
-  font-size: 18px;
-  min-height: 54px;
+  font-size: 16px;
+  min-height: 46px;
 }
 
 .is-compact-flow .footer-actions {
-  margin-top: -2px;
+  margin-top: -5px;
+}
+
+.is-compact-flow .text-button {
+  min-height: 34px;
+}
+
+.is-compact-flow .notice {
+  display: none;
 }
 
 @media (max-width: 430px) {
   .is-compact-flow {
-    padding-top: 8px;
+    padding-top: 6px;
   }
 
   .is-compact-flow .compact-hero {
     gap: 0;
     min-height: auto;
-    padding: 14px 16px 16px;
+    padding: 10px 12px;
   }
 
   .is-compact-flow .hero h1 {
-    font-size: 31px;
+    font-size: 23px;
   }
 
   .is-compact-flow .step-pill {
-    font-size: 12px;
-    min-height: 34px;
+    font-size: 11px;
+    min-height: 29px;
     padding: 0 4px;
   }
 
   .is-compact-flow .camera-preview {
-    aspect-ratio: 16 / 6;
-    max-height: 104px;
+    aspect-ratio: 16 / 4.5;
+    max-height: 72px;
   }
 
   .is-compact-flow .review-grid {
@@ -1275,20 +1287,21 @@ textarea:focus {
 
   .is-compact-flow .review-photo {
     gap: 4px;
-    padding: 6px;
+    padding: 5px;
   }
 
   .is-compact-flow .review-photo div {
-    aspect-ratio: 1 / 1;
+    aspect-ratio: 4 / 3;
   }
 
   .is-compact-flow .review-photo button {
-    min-height: 32px;
+    font-size: 12px;
+    min-height: 28px;
   }
 
   .is-compact-flow .summary-row {
-    min-height: 38px;
-    padding: 6px 10px;
+    min-height: 31px;
+    padding: 4px 8px;
   }
 
   .is-compact-flow .summary-row span,
@@ -1296,7 +1309,8 @@ textarea:focus {
     font-size: 12px;
   }
 
-  .is-compact-flow .notice {
-    padding: 10px;
+  .is-compact-flow .primary-button svg {
+    height: 17px;
+    width: 17px;
   }
 }
