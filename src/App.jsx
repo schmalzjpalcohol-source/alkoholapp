@@ -4,10 +4,14 @@ import { createRoot } from "react-dom/client";
 import "./styles.css";
 
 const RECIPIENT_EMAIL = "recipient@example.invalid";
+const TRIP_TYPES = [
+  { value: "departure", label: "出発" },
+  { value: "arrival", label: "到着" }
+];
 
 function App() {
   const pageRef = useRef(null);
-  const [tripType, setTripType] = useState("Departure");
+  const [tripType, setTripType] = useState("departure");
   const [name, setName] = useState("");
   const [bacValue, setBacValue] = useState("");
   const [note, setNote] = useState("");
@@ -33,8 +37,8 @@ function App() {
       bacValue: bacValue.trim(),
       note: note.trim(),
       dateTime: createdAt,
-      personPhotoName: personPhoto?.name || "person photo",
-      bacPhotoName: bacPhoto?.name || "bac photo"
+      personPhotoName: personPhoto?.name || "本人写真",
+      bacPhotoName: bacPhoto?.name || "アルコール検知器の写真"
     }),
     [bacPhoto, bacValue, createdAt, name, note, personPhoto, tripType]
   );
@@ -62,7 +66,7 @@ function App() {
   async function sendEmail(event) {
     event.preventDefault();
     if (!canCreate) {
-      setStatus("Please complete all required fields and both photos.");
+      setStatus("必須項目を入力し、2枚の写真を撮影してください。");
       return;
     }
 
@@ -83,13 +87,13 @@ function App() {
           title: buildEmailSubject(packageData.data),
           text: buildEmailBody(packageData.data)
         });
-        setStatus(`Prepared for ${RECIPIENT_EMAIL}. Subject: ${buildEmailSubject(packageData.data)}`);
+        setStatus(`宛先: ${RECIPIENT_EMAIL} / 件名: ${buildEmailSubject(packageData.data)}`);
         return;
       }
 
-      setStatus("This browser cannot attach files from the page. Please open this page in Safari on iPhone and tap Send email again.");
+      setStatus("このブラウザではファイルを添付できません。iPhoneのSafariで開き直して、もう一度「メールを送信」を押してください。");
     } catch {
-      setStatus("Email sharing was cancelled. Tap Send email to try again.");
+      setStatus("メール共有がキャンセルされました。もう一度「メールを送信」を押してください。");
     } finally {
       setBusy(false);
     }
@@ -112,7 +116,7 @@ function App() {
 
   function resetFlow() {
     if (reportFile?.url) URL.revokeObjectURL(reportFile.url);
-    setTripType("Departure");
+    setTripType("departure");
     setName("");
     setBacValue("");
     setNote("");
@@ -133,8 +137,8 @@ function App() {
               <ShieldCheck size={26} />
               <span>ProofFlow</span>
             </div>
-            <h1>Alcohol Check</h1>
-            <p>Submit an arrival or departure alcohol check.</p>
+            <h1>アルコールチェック</h1>
+            <p>出発・到着時のアルコール確認を送信します。</p>
           </div>
           <div className="hero-visual" aria-hidden="true">
             <div className="meter-card">
@@ -144,40 +148,40 @@ function App() {
             </div>
             <div className="photo-card">
               <Camera size={28} />
-              <span>2 photos</span>
+              <span>写真2枚</span>
             </div>
           </div>
         </header>
 
         <form className="submission-panel" onSubmit={sendEmail}>
           <div className="flow-progress">
-            <StepPill active={currentStep === "details"} done={canContinueDetails} label="1. Details" />
-            <StepPill active={currentStep === "photos"} done={Boolean(personPhoto && bacPhoto)} label="2. Photos" />
-            <StepPill active={currentStep === "send"} done={Boolean(personPhoto && bacPhoto)} label="3. Send" />
+            <StepPill active={currentStep === "details"} done={canContinueDetails} label="1. 入力" />
+            <StepPill active={currentStep === "photos"} done={Boolean(personPhoto && bacPhoto)} label="2. 写真" />
+            <StepPill active={currentStep === "send"} done={Boolean(personPhoto && bacPhoto)} label="3. 送信" />
           </div>
 
           {currentStep === "details" && (
             <section className="form-step">
-              <div className="choice-row" role="radiogroup" aria-label="Trip type">
-                {["Departure", "Arrival"].map((option) => (
+              <div className="choice-row" role="radiogroup" aria-label="確認種別">
+                {TRIP_TYPES.map((option) => (
                   <button
-                    className={tripType === option ? "choice-button active" : "choice-button"}
-                    key={option}
-                    onClick={() => setTripType(option)}
+                    className={tripType === option.value ? "choice-button active" : "choice-button"}
+                    key={option.value}
+                    onClick={() => setTripType(option.value)}
                     type="button"
                   >
-                    {option}
+                    {option.label}
                   </button>
                 ))}
               </div>
 
               <label>
-                Name
-                <input autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Full name" required />
+                氏名
+                <input autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} placeholder="氏名を入力" required />
               </label>
 
               <label>
-                BAC value
+                BAC値
                 <input
                   inputMode="decimal"
                   value={bacValue}
@@ -188,12 +192,12 @@ function App() {
               </label>
 
               <label>
-                Notes
-                <textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Optional" />
+                備考
+                <textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="任意" />
               </label>
 
               <button className="primary-button wide big-next" disabled={!canContinueDetails} onClick={() => goToStep("photos")} type="button">
-                Continue
+                続ける
               </button>
             </section>
           )}
@@ -205,17 +209,17 @@ function App() {
                 file={personPhoto}
                 inputId="person-photo"
                 onChange={updatePersonPhoto}
-                title="Person photo"
+                title="本人写真"
               />
               <CameraStep
                 capture="environment"
                 file={bacPhoto}
                 inputId="bac-photo"
                 onChange={updateBacPhoto}
-                title="BAC meter photo"
+                title="アルコール検知器の写真"
               />
               <button className="primary-button wide big-next" disabled={!personPhoto || !bacPhoto} onClick={() => goToStep("send")} type="button">
-                Review
+                確認する
               </button>
             </section>
           )}
@@ -223,18 +227,18 @@ function App() {
           {currentStep === "send" && (
             <section className="review-screen">
               <div className="summary-list">
-                <SummaryRow label="To" value={RECIPIENT_EMAIL} />
-                <SummaryRow label="Subject" value={emailSubject} />
-                <SummaryRow label="Type" value={tripType} />
-                <SummaryRow label="Name" value={name || "-"} />
-                <SummaryRow label="BAC" value={bacValue || "-"} />
-                <SummaryRow label="Date" value={formatDisplayDate(reportData.dateTime)} />
-                <SummaryRow label="Time" value={formatDisplayTime(reportData.dateTime)} />
+                <SummaryRow label="宛先" value={RECIPIENT_EMAIL} />
+                <SummaryRow label="件名" value={emailSubject} />
+                <SummaryRow label="種別" value={getTripTypeLabel(tripType)} />
+                <SummaryRow label="氏名" value={name || "-"} />
+                <SummaryRow label="BAC値" value={bacValue || "-"} />
+                <SummaryRow label="日付" value={formatDisplayDate(reportData.dateTime)} />
+                <SummaryRow label="時刻" value={formatDisplayTime(reportData.dateTime)} />
               </div>
 
               <div className="review-grid">
-                <PhotoPreview file={personPhoto} onRetake={() => goToStep("photos")} title="Person photo" />
-                <PhotoPreview file={bacPhoto} onRetake={() => goToStep("photos")} title="BAC meter photo" />
+                <PhotoPreview file={personPhoto} onRetake={() => goToStep("photos")} title="本人写真" />
+                <PhotoPreview file={bacPhoto} onRetake={() => goToStep("photos")} title="検知器写真" />
               </div>
 
               {status && <p className={reportFile ? "success" : "info"}>{status}</p>}
@@ -242,7 +246,7 @@ function App() {
               <div className="action-grid">
                 <button className="primary-button" disabled={!canCreate || busy} type="submit">
                   <Send size={20} />
-                  {busy ? "Preparing..." : "Send email"}
+                  {busy ? "準備中..." : "メールを送信"}
                 </button>
               </div>
             </section>
@@ -251,19 +255,19 @@ function App() {
           <div className="footer-actions">
             {currentStep !== "details" && (
               <button className="text-button" onClick={() => goToStep(currentStep === "send" ? "photos" : "details")} type="button">
-                Back
+                戻る
               </button>
             )}
             <button className="text-button" onClick={resetFlow} type="button">
               <RotateCcw size={16} />
-              Reset
+              リセット
             </button>
           </div>
         </form>
 
         <section className="notice">
           <Mail size={20} />
-          <p>Send email opens the iPhone share sheet with the report and both photos attached. Choose Mail to send it.</p>
+          <p>「メールを送信」を押すと、レポートと2枚の写真を添付した状態でiPhoneの共有画面が開きます。メールアプリを選んで送信してください。</p>
         </section>
       </section>
     </main>
@@ -286,12 +290,12 @@ function CameraStep({ capture, file, inputId, onChange, title }) {
     <section className="camera-step compact-camera">
       <div className="camera-step-title">
         <h2>{title}</h2>
-        {file && <span>Ready</span>}
+        {file && <span>完了</span>}
       </div>
       <div className="camera-preview">{preview ? <img alt="" src={preview} /> : <Camera size={48} />}</div>
       <label className="camera-button secondary-camera" htmlFor={inputId}>
         <Camera size={24} />
-        <span>{file ? "Retake photo" : "Open camera"}</span>
+        <span>{file ? "撮り直す" : "カメラを開く"}</span>
       </label>
       <input
         accept="image/*"
@@ -313,7 +317,7 @@ function PhotoPreview({ file, onRetake, title }) {
       <div>{preview ? <img alt="" src={preview} /> : <Camera size={28} />}</div>
       <strong>{title}</strong>
       <button onClick={onRetake} type="button">
-        Change
+        変更
       </button>
     </article>
   );
@@ -333,50 +337,50 @@ function useObjectUrl(file) {
 }
 
 function buildEmailSubject(data) {
-  return `${data.tripType} alcohol check - ${data.name || "Unknown"} - ${formatFileDate(data.dateTime)}`;
+  return `アルコールチェック（${getTripTypeLabel(data.tripType)}） - ${data.name || "氏名未入力"} - ${formatFileDate(data.dateTime)}`;
 }
 
 function buildEmailBody(data) {
   return [
-    "Hello,",
+    "お疲れさまです。",
     "",
-    "Please find the alcohol check details below.",
+    "アルコールチェックの内容を送付します。",
     "",
-    `Check type: ${data.tripType}`,
-    `Name: ${data.name}`,
-    `Date: ${formatDisplayDate(data.dateTime)}`,
-    `Time: ${formatDisplayTime(data.dateTime)}`,
-    `BAC value: ${data.bacValue}`,
+    `種別: ${getTripTypeLabel(data.tripType)}`,
+    `氏名: ${data.name}`,
+    `日付: ${formatDisplayDate(data.dateTime)}`,
+    `時刻: ${formatDisplayTime(data.dateTime)}`,
+    `BAC値: ${data.bacValue}`,
     "",
-    "Attached photo files:",
-    `Person photo: ${data.personPhotoName}`,
-    `BAC meter photo: ${data.bacPhotoName}`,
+    "添付ファイル:",
+    `本人写真: ${data.personPhotoName}`,
+    `アルコール検知器の写真: ${data.bacPhotoName}`,
     "",
-    data.note ? `Notes: ${data.note}` : "Notes: -",
+    data.note ? `備考: ${data.note}` : "備考: -",
     "",
-    "Please make sure the report file and both photos are attached."
+    "レポートファイルと2枚の写真が添付されています。"
   ].join("\n");
 }
 
 function buildReportText(data) {
   return [
-    "PROOFFLOW ALCOHOL CHECK REPORT",
-    "================================",
+    "PROOFFLOW アルコールチェック レポート",
+    "====================================",
     "",
-    `Recipient: ${RECIPIENT_EMAIL}`,
-    `Check type: ${data.tripType}`,
-    `Name: ${data.name}`,
-    `Date: ${formatDisplayDate(data.dateTime)}`,
-    `Time: ${formatDisplayTime(data.dateTime)}`,
-    `BAC value: ${data.bacValue}`,
+    `宛先: ${RECIPIENT_EMAIL}`,
+    `種別: ${getTripTypeLabel(data.tripType)}`,
+    `氏名: ${data.name}`,
+    `日付: ${formatDisplayDate(data.dateTime)}`,
+    `時刻: ${formatDisplayTime(data.dateTime)}`,
+    `BAC値: ${data.bacValue}`,
     "",
-    "Photos",
-    "------",
-    `Person photo: ${data.personPhotoName}`,
-    `BAC meter photo: ${data.bacPhotoName}`,
+    "写真",
+    "----",
+    `本人写真: ${data.personPhotoName}`,
+    `アルコール検知器の写真: ${data.bacPhotoName}`,
     "",
-    "Notes",
-    "-----",
+    "備考",
+    "----",
     data.note || "-"
   ].join("\n");
 }
@@ -459,6 +463,10 @@ function imageExtensionFromType(type) {
   return ".jpg";
 }
 
+function getTripTypeLabel(value) {
+  return TRIP_TYPES.find((item) => item.value === value)?.label || value;
+}
+
 function safeFilePart(value) {
   return String(value).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "check";
 }
@@ -468,11 +476,11 @@ function formatFileDate(date) {
 }
 
 function formatDisplayDate(date) {
-  return date.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return date.toLocaleDateString("ja-JP", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 function formatDisplayTime(date) {
-  return date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  return date.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
 }
 
 createRoot(document.getElementById("root")).render(<App />);

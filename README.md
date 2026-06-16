@@ -1,35 +1,35 @@
 # ProofFlow
 
-Static mobile React app for GitHub Pages. Users enter an arrival/departure check, name, BAC value, take two photos, generate a lightweight text report, and open a prepared email draft.
+GitHub Pages 用の静的なモバイル向け React アプリです。利用者は出発・到着の種別、氏名、BAC値を入力し、本人写真とアルコール検知器の写真を撮影して、iPhone の共有画面からメールで送信します。
 
-GitHub Pages cannot run a backend, store a database, or silently send email attachments. The app therefore creates the report file in the browser and prepares the email subject/body with all structured data.
+GitHub Pages ではバックエンド、データベース、自動メール送信は実行できません。そのため、このアプリはブラウザ上でレポートファイルと写真を準備し、iPhone の共有画面からメールアプリを選んで送信する形にしています。
 
-## Set Recipient
+## 宛先の設定
 
-Edit the recipient in `src/App.jsx`:
+宛先は `src/App.jsx` で設定します。
 
 ```js
 const RECIPIENT_EMAIL = "recipient@example.invalid";
 ```
 
-## Local Start
+## ローカル起動
 
 ```bash
 npm install
 npm run client:dev
 ```
 
-Open the Vite URL shown in the terminal.
+ターミナルに表示された Vite のURLを開きます。
 
-## Build For GitHub Pages
+## GitHub Pages 用ビルド
 
 ```bash
 npm run build:pages
 ```
 
-Commit and publish the generated `docs` folder with GitHub Pages.
+生成された `docs` フォルダをコミットして GitHub Pages で公開します。
 
-Recommended Pages settings:
+推奨設定:
 
 ```text
 Source: Deploy from a branch
@@ -37,10 +37,9 @@ Branch: test/githubpages_test
 Folder: /docs
 ```
 
-## GitHub Pages Notes
+## 注意点
 
-- No login is included because GitHub Pages is static.
-- No database is included because there is no server process.
-- The generated report is a lightweight `.txt` file.
-- Email opens with `mailto:` and includes the subject/body.
-- Photo attachments still need the user's email/share sheet because static GitHub Pages cannot send files by itself.
+- GitHub Pages は静的サイトなので、ログイン機能やデータベースはありません。
+- メールの完全自動送信はできません。
+- 「メールを送信」を押すと、レポートと2枚の写真を添付した状態で iPhone の共有画面が開きます。
+- 共有画面で Mail を選び、利用者が送信を確定します。
