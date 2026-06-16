@@ -1,4 +1,4 @@
-import { Camera, CheckCircle2, Download, Gauge, Mail, RotateCcw, Send, ShieldCheck } from "lucide-react";
+import { Camera, CheckCircle2, Gauge, Mail, RotateCcw, Send, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
@@ -40,7 +40,26 @@ function App() {
   );
   const emailSubject = buildEmailSubject(reportData);
 
-  async function createReport(event) {
+  function createAttachmentFiles(timestamp) {
+    if (!canCreate) {
+      return null;
+    }
+
+    const currentReportData = { ...reportData, dateTime: timestamp };
+    const reportText = buildReportText(currentReportData);
+    const fileStamp = formatFileDate(timestamp);
+    const reportName = `proofflow-report-${safeFilePart(tripType)}-${safeFilePart(name)}-${fileStamp}.txt`;
+    return {
+      data: currentReportData,
+      files: [
+        new File([reportText], reportName, { type: "text/plain" }),
+        renamePhotoFile(personPhoto, `person-photo-${fileStamp}`),
+        renamePhotoFile(bacPhoto, `bac-meter-photo-${fileStamp}`)
+      ]
+    };
+  }
+
+  async function sendEmail(event) {
     event.preventDefault();
     if (!canCreate) {
       setStatus("Please complete all required fields and both photos.");
@@ -51,47 +70,29 @@ function App() {
     setStatus("");
 
     const timestamp = new Date();
-    const currentReportData = { ...reportData, dateTime: timestamp };
-    const reportText = buildReportText(currentReportData);
-    const fileStamp = formatFileDate(timestamp);
-    const reportName = `proofflow-report-${safeFilePart(tripType)}-${safeFilePart(name)}-${fileStamp}.txt`;
-    const emailName = `proofflow-email-${safeFilePart(tripType)}-${safeFilePart(name)}-${fileStamp}.eml`;
-    const reportFileForAttachment = new File([reportText], reportName, { type: "text/plain" });
-    const personFile = renamePhotoFile(personPhoto, `person-photo-${fileStamp}`);
-    const bacFile = renamePhotoFile(bacPhoto, `bac-meter-photo-${fileStamp}`);
-    const emailText = await buildEmlMessage(currentReportData, [reportFileForAttachment, personFile, bacFile]);
-    const emailBlob = new Blob([emailText], { type: "message/rfc822;charset=utf-8" });
-    const emailFile = new File([emailBlob], emailName, { type: "message/rfc822" });
-    const url = URL.createObjectURL(emailBlob);
+    const packageData = createAttachmentFiles(timestamp);
+    if (!packageData) return;
 
-    if (reportFile?.url) URL.revokeObjectURL(reportFile.url);
     setCreatedAt(timestamp);
-    setReportFile({
-      file: emailFile,
-      files: [emailFile],
-      name: emailName,
-      text: emailText,
-      url
-    });
-    downloadUrl(url, emailName);
-    setStatus(`Email file created for ${RECIPIENT_EMAIL}. Subject: ${buildEmailSubject(currentReportData)}`);
-    setBusy(false);
-  }
+    setReportFile({ files: packageData.files });
 
-  async function shareReport() {
-    const files = reportFile?.files || [];
-    if (files.length === 0) return;
+    try {
+      if (navigator.canShare?.({ files: packageData.files }) && navigator.share) {
+        await navigator.share({
+          files: packageData.files,
+          title: buildEmailSubject(packageData.data),
+          text: buildEmailBody(packageData.data)
+        });
+        setStatus(`Prepared for ${RECIPIENT_EMAIL}. Subject: ${buildEmailSubject(packageData.data)}`);
+        return;
+      }
 
-    if (navigator.canShare?.({ files }) && navigator.share) {
-      await navigator.share({
-        files,
-        title: buildEmailSubject(reportData),
-        text: buildEmailBody(reportData)
-      });
-      return;
+      setStatus("This browser cannot attach files from the page. Please open this page in Safari on iPhone and tap Send email again.");
+    } catch {
+      setStatus("Email sharing was cancelled. Tap Send email to try again.");
+    } finally {
+      setBusy(false);
     }
-
-    setStatus("Your browser cannot share the email file directly. Open the downloaded .eml file from Files/Mail.");
   }
 
   function goToStep(step) {
@@ -148,11 +149,11 @@ function App() {
           </div>
         </header>
 
-        <form className="submission-panel" onSubmit={createReport}>
+        <form className="submission-panel" onSubmit={sendEmail}>
           <div className="flow-progress">
             <StepPill active={currentStep === "details"} done={canContinueDetails} label="1. Details" />
             <StepPill active={currentStep === "photos"} done={Boolean(personPhoto && bacPhoto)} label="2. Photos" />
-            <StepPill active={currentStep === "send"} done={Boolean(reportFile)} label="3. Send" />
+            <StepPill active={currentStep === "send"} done={Boolean(personPhoto && bacPhoto)} label="3. Send" />
           </div>
 
           {currentStep === "details" && (
@@ -240,12 +241,8 @@ function App() {
 
               <div className="action-grid">
                 <button className="primary-button" disabled={!canCreate || busy} type="submit">
-                  <Download size={20} />
-                  {busy ? "Creating..." : "Create email file"}
-                </button>
-                <button className="secondary-button" disabled={!reportFile} onClick={shareReport} type="button">
                   <Send size={20} />
-                  Send email
+                  {busy ? "Preparing..." : "Send email"}
                 </button>
               </div>
             </section>
@@ -266,7 +263,7 @@ function App() {
 
         <section className="notice">
           <Mail size={20} />
-          <p>Create email file first, then tap Send email to open/share the prepared message with all attachments.</p>
+          <p>Send email opens the iPhone share sheet with the report and both photos attached. Choose Mail to send it.</p>
         </section>
       </section>
     </main>
