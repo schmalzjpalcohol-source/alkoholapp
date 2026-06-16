@@ -21,7 +21,6 @@ function App() {
 
   const canContinueDetails = name.trim() && bacValue.trim();
   const canCreate = canContinueDetails && personPhoto && bacPhoto;
-  const emailSubject = buildEmailSubject(reportData);
 
   useEffect(() => {
     pageRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
@@ -39,6 +38,7 @@ function App() {
     }),
     [bacPhoto, bacValue, createdAt, name, note, personPhoto, tripType]
   );
+  const emailSubject = buildEmailSubject(reportData);
 
   async function createReport(event) {
     event.preventDefault();
