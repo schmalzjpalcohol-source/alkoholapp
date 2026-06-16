@@ -1257,17 +1257,17 @@ textarea:focus {
 
 @media (max-width: 430px) {
   .is-compact-flow {
-    padding-top: 6px;
+    padding-top: 4px;
   }
 
   .is-compact-flow .compact-hero {
     gap: 0;
     min-height: auto;
-    padding: 10px 12px;
+    padding: 8px 10px;
   }
 
   .is-compact-flow .hero h1 {
-    font-size: 23px;
+    font-size: 20px;
   }
 
   .is-compact-flow .step-pill {
@@ -1277,8 +1277,8 @@ textarea:focus {
   }
 
   .is-compact-flow .camera-preview {
-    aspect-ratio: 16 / 4.5;
-    max-height: 72px;
+    aspect-ratio: 16 / 4;
+    max-height: 56px;
   }
 
   .is-compact-flow .review-grid {
@@ -1300,8 +1300,8 @@ textarea:focus {
   }
 
   .is-compact-flow .summary-row {
-    min-height: 31px;
-    padding: 4px 8px;
+    min-height: 28px;
+    padding: 3px 7px;
   }
 
   .is-compact-flow .summary-row span,
@@ -1312,5 +1312,153 @@ textarea:focus {
   .is-compact-flow .primary-button svg {
     height: 17px;
     width: 17px;
+  }
+}
+
+@media (max-width: 430px) {
+  .mobile-page {
+    max-width: 390px;
+  }
+
+  .page {
+    padding: 6px 6px 16px;
+  }
+
+  .hero {
+    gap: 10px;
+    min-height: 126px;
+    padding: 14px;
+  }
+
+  .brand-line {
+    font-size: 13px;
+    gap: 7px;
+    margin-bottom: 6px;
+  }
+
+  .brand-line svg {
+    height: 19px;
+    width: 19px;
+  }
+
+  .hero h1 {
+    font-size: 30px;
+    line-height: 1;
+    margin-bottom: 5px;
+  }
+
+  .hero p {
+    font-size: 13px;
+    line-height: 1.25;
+  }
+
+  .hero-visual {
+    display: none;
+  }
+
+  .submission-panel {
+    gap: 8px;
+    margin-top: 7px;
+    padding: 9px;
+  }
+
+  .flow-progress {
+    gap: 4px;
+    margin-bottom: 4px;
+  }
+
+  .step-pill {
+    font-size: 11px;
+    min-height: 28px;
+    padding: 0 4px;
+  }
+
+  .step-pill svg {
+    height: 12px;
+    width: 12px;
+  }
+
+  .form-step,
+  .review-screen {
+    gap: 8px;
+  }
+
+  label {
+    font-size: 12px;
+    gap: 5px;
+  }
+
+  input,
+  textarea {
+    min-height: 38px;
+    padding: 8px 10px;
+  }
+
+  textarea {
+    min-height: 50px;
+  }
+
+  .choice-row {
+    gap: 4px;
+    padding: 4px;
+  }
+
+  .choice-button {
+    min-height: 40px;
+  }
+
+  .primary-button,
+  .secondary-button {
+    min-height: 40px;
+    padding: 0 12px;
+  }
+
+  .big-next,
+  .review-screen .primary-button {
+    font-size: 15px;
+    min-height: 42px;
+  }
+
+  .footer-actions {
+    gap: 4px;
+  }
+
+  .text-button {
+    font-size: 13px;
+    min-height: 30px;
+    padding: 0 8px;
+  }
+
+  .notice {
+    display: none;
+  }
+}
+
+@media (max-height: 760px) and (max-width: 430px) {
+  .hero {
+    min-height: 112px;
+    padding: 12px;
+  }
+
+  .hero h1 {
+    font-size: 27px;
+  }
+
+  .is-compact-flow .compact-hero {
+    padding: 7px 9px;
+  }
+
+  .is-compact-flow .hero h1 {
+    font-size: 19px;
+  }
+
+  .is-compact-flow .camera-preview {
+    max-height: 48px;
+  }
+
+  .is-compact-flow .secondary-camera,
+  .is-compact-flow .big-next,
+  .is-compact-flow .review-screen .primary-button {
+    min-height: 38px;
   }
 }
