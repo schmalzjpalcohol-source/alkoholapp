@@ -1,8 +1,8 @@
 # ProofFlow
 
-Static React app for GitHub Pages. Users enter their details, take two photos, generate one finished HTML submission file, and open an email draft for sending it.
+Static mobile React app for GitHub Pages. Users enter an arrival/departure check, name, BAC value, take two photos, generate a lightweight text report, and open an email draft for App Maintainer.
 
-GitHub Pages cannot run a backend, store a database, or attach files to email automatically. The app therefore creates the finished file in the browser. The user downloads that file and attaches it to the opened email.
+GitHub Pages cannot run a backend, store a database, or silently send email attachments. The app therefore creates the report file in the browser and prepares the email subject/body with all structured data.
 
 ## Set Recipient
 
@@ -27,11 +27,20 @@ Open the Vite URL shown in the terminal.
 npm run build:pages
 ```
 
-Upload or publish the generated `dist` folder with GitHub Pages.
+Commit and publish the generated `docs` folder with GitHub Pages.
+
+Recommended Pages settings:
+
+```text
+Source: Deploy from a branch
+Branch: test/githubpages_test
+Folder: /docs
+```
 
 ## GitHub Pages Notes
 
 - No login is included because GitHub Pages is static.
 - No database is included because there is no server process.
-- Photos are embedded into the generated HTML file.
-- Email opens with `mailto:`. The downloaded file still needs to be attached manually.
+- The generated report is a lightweight `.txt` file.
+- Email opens with `mailto:` and includes the subject/body.
+- Photo attachments still need the user's email/share sheet because static GitHub Pages cannot send files by itself.

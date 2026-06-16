@@ -1,4 +1,4 @@
-import { Camera, CheckCircle2, Download, FileText, Mail, RotateCcw, Send, ShieldCheck } from "lucide-react";
+import { Camera, CheckCircle2, Download, Mail, RotateCcw, Share2, ShieldCheck } from "lucide-react";
 import { useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
@@ -6,208 +6,231 @@ import "./styles.css";
 const RECIPIENT_EMAIL = "recipient@example.invalid";
 
 function App() {
+  const [tripType, setTripType] = useState("Departure");
   const [name, setName] = useState("");
-  const [identifier, setIdentifier] = useState("");
+  const [bacValue, setBacValue] = useState("");
   const [note, setNote] = useState("");
   const [personPhoto, setPersonPhoto] = useState(null);
-  const [devicePhoto, setDevicePhoto] = useState(null);
-  const [currentStep, setCurrentStep] = useState("person");
-  const [packageFile, setPackageFile] = useState(null);
+  const [bacPhoto, setBacPhoto] = useState(null);
+  const [currentStep, setCurrentStep] = useState("details");
+  const [reportFile, setReportFile] = useState(null);
+  const [createdAt, setCreatedAt] = useState(new Date());
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
 
-  const readyCount = [personPhoto, devicePhoto].filter(Boolean).length;
-  const canCreate = name.trim() && identifier.trim() && personPhoto && devicePhoto;
+  const canContinueDetails = name.trim() && bacValue.trim();
+  const canCreate = canContinueDetails && personPhoto && bacPhoto;
 
-  async function createSubmission(event) {
+  const reportData = useMemo(
+    () => ({
+      tripType,
+      name: name.trim(),
+      bacValue: bacValue.trim(),
+      note: note.trim(),
+      dateTime: createdAt,
+      personPhotoName: personPhoto?.name || "person photo",
+      bacPhotoName: bacPhoto?.name || "bac photo"
+    }),
+    [bacPhoto, bacValue, createdAt, name, note, personPhoto, tripType]
+  );
+
+  async function createReport(event) {
     event.preventDefault();
     if (!canCreate) {
-      setStatus("Bitte Name, Kennung und beide Bilder ausfuellen.");
+      setStatus("Please complete all required fields and both photos.");
       return;
     }
 
     setBusy(true);
     setStatus("");
 
-    try {
-      const submission = {
-        name: name.trim(),
-        identifier: identifier.trim(),
-        note: note.trim(),
-        createdAt: new Date().toISOString(),
-        personPhoto: await fileToDataUrl(personPhoto),
-        devicePhoto: await fileToDataUrl(devicePhoto),
-        personPhotoName: personPhoto.name || "person.jpg",
-        devicePhotoName: devicePhoto.name || "geraet.jpg"
-      };
-      const html = buildSubmissionHtml(submission);
-      const slug = `${safeFilePart(submission.identifier)}-${new Date().toISOString().slice(0, 10)}`;
-      const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
+    const timestamp = new Date();
+    const currentReportData = { ...reportData, dateTime: timestamp };
+    const reportText = buildReportText(currentReportData);
+    const fileName = `proofflow-${safeFilePart(tripType)}-${safeFilePart(name)}-${formatFileDate(timestamp)}.txt`;
+    const blob = new Blob([reportText], { type: "text/plain;charset=utf-8" });
+    const file = new File([blob], fileName, { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
 
-      if (packageFile?.url) URL.revokeObjectURL(packageFile.url);
-      setPackageFile({ url, name: `abgabe-${slug}.html` });
-      setStatus("Fertige Abgabedatei wurde erstellt.");
-      setCurrentStep("send");
-    } catch {
-      setStatus("Die Datei konnte nicht erstellt werden. Bitte Bilder nochmal auswaehlen.");
-    } finally {
-      setBusy(false);
-    }
+    if (reportFile?.url) URL.revokeObjectURL(reportFile.url);
+    setCreatedAt(timestamp);
+    setReportFile({ file, name: fileName, text: reportText, url });
+    downloadUrl(url, fileName);
+    setStatus("Report file created and downloaded.");
+    setBusy(false);
   }
 
-  function resetFlow() {
-    if (packageFile?.url) URL.revokeObjectURL(packageFile.url);
-    setPersonPhoto(null);
-    setDevicePhoto(null);
-    setNote("");
-    setPackageFile(null);
-    setStatus("");
-    setCurrentStep("person");
+  async function shareReport() {
+    const file = reportFile?.file;
+    if (!file) return;
+
+    if (navigator.canShare?.({ files: [file] }) && navigator.share) {
+      await navigator.share({
+        files: [file],
+        title: buildEmailSubject(reportData),
+        text: buildEmailBody(reportData)
+      });
+      return;
+    }
+
+    openEmailDraft();
   }
 
   function openEmailDraft() {
-    const subject = encodeURIComponent(`Foto-Abgabe ${identifier || name}`);
-    const body = encodeURIComponent(
-      [
-        "Hallo,",
-        "",
-        "anbei die fertige Foto-Abgabe.",
-        "",
-        `Name: ${name}`,
-        `Kennung: ${identifier}`,
-        note ? `Notiz: ${note}` : "",
-        "",
-        "Hinweis: Bitte die heruntergeladene HTML-Datei an diese E-Mail anhaengen.",
-        ""
-      ]
-        .filter(Boolean)
-        .join("\n")
-    );
-
+    const subject = encodeURIComponent(buildEmailSubject(reportData));
+    const body = encodeURIComponent(buildEmailBody(reportData));
     window.location.href = `mailto:${RECIPIENT_EMAIL}?subject=${subject}&body=${body}`;
+  }
+
+  function resetFlow() {
+    if (reportFile?.url) URL.revokeObjectURL(reportFile.url);
+    setTripType("Departure");
+    setName("");
+    setBacValue("");
+    setNote("");
+    setPersonPhoto(null);
+    setBacPhoto(null);
+    setReportFile(null);
+    setCreatedAt(new Date());
+    setStatus("");
+    setCurrentStep("details");
   }
 
   return (
     <main className="app-shell">
-      <section className="page">
-        <header className="hero">
+      <section className="page mobile-page">
+        <header className="hero compact-hero">
           <div className="hero-copy">
             <div className="brand-line">
-              <ShieldCheck size={28} />
+              <ShieldCheck size={26} />
               <span>ProofFlow</span>
             </div>
-            <h1>Foto-Abgabe</h1>
-            <p>Bilder aufnehmen, fertige Datei erstellen und per E-Mail weiterleiten.</p>
+            <h1>Alcohol Check</h1>
+            <p>Submit arrival or departure proof to App Maintainer.</p>
           </div>
         </header>
 
-        <form className="submission-panel" onSubmit={createSubmission}>
-          <div className="details-grid">
-            <label>
-              Name
-              <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Max Mustermann" required />
-            </label>
-            <label>
-              Kennung
-              <input value={identifier} onChange={(event) => setIdentifier(event.target.value)} placeholder="Fahrzeug, Tour oder ID" required />
-            </label>
-          </div>
-
+        <form className="submission-panel" onSubmit={createReport}>
           <div className="flow-progress">
-            <StepPill active={currentStep === "person"} done={Boolean(personPhoto)} label="1. Person" />
-            <StepPill active={currentStep === "device"} done={Boolean(devicePhoto)} label="2. Geraet" />
-            <StepPill active={currentStep === "send"} done={Boolean(packageFile)} label="3. Datei" />
+            <StepPill active={currentStep === "details"} done={canContinueDetails} label="1. Details" />
+            <StepPill active={currentStep === "photos"} done={Boolean(personPhoto && bacPhoto)} label="2. Photos" />
+            <StepPill active={currentStep === "send"} done={Boolean(reportFile)} label="3. Send" />
           </div>
 
-          {currentStep === "person" && (
-            <CameraStep
-              capture="user"
-              detail="Nimm ein klares Foto von dir auf."
-              file={personPhoto}
-              inputId="person-photo"
-              onChange={setPersonPhoto}
-              onNext={() => setCurrentStep("device")}
-              step="1"
-              title="Foto von dir"
-            />
+          {currentStep === "details" && (
+            <section className="form-step">
+              <div className="choice-row" role="radiogroup" aria-label="Trip type">
+                {["Departure", "Arrival"].map((option) => (
+                  <button
+                    className={tripType === option ? "choice-button active" : "choice-button"}
+                    key={option}
+                    onClick={() => setTripType(option)}
+                    type="button"
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+
+              <label>
+                Name
+                <input autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Full name" required />
+              </label>
+
+              <label>
+                BAC value
+                <input
+                  inputMode="decimal"
+                  value={bacValue}
+                  onChange={(event) => setBacValue(event.target.value)}
+                  placeholder="0.00"
+                  required
+                />
+              </label>
+
+              <label>
+                Notes
+                <textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Optional" />
+              </label>
+
+              <button className="primary-button wide big-next" disabled={!canContinueDetails} onClick={() => setCurrentStep("photos")} type="button">
+                Continue
+              </button>
+            </section>
           )}
 
-          {currentStep === "device" && (
-            <CameraStep
-              capture="environment"
-              detail="Nimm ein klares Foto vom Geraet oder Display auf."
-              file={devicePhoto}
-              inputId="device-photo"
-              onChange={setDevicePhoto}
-              onNext={() => setCurrentStep("send")}
-              step="2"
-              title="Foto vom Geraet"
-            />
+          {currentStep === "photos" && (
+            <section className="form-step">
+              <CameraStep
+                capture="user"
+                file={personPhoto}
+                inputId="person-photo"
+                onChange={setPersonPhoto}
+                title="Person photo"
+              />
+              <CameraStep
+                capture="environment"
+                file={bacPhoto}
+                inputId="bac-photo"
+                onChange={setBacPhoto}
+                title="BAC meter photo"
+              />
+              <button className="primary-button wide big-next" disabled={!personPhoto || !bacPhoto} onClick={() => setCurrentStep("send")} type="button">
+                Review
+              </button>
+            </section>
           )}
 
           {currentStep === "send" && (
             <section className="review-screen">
-              <div className="simple-heading">
-                <span>3</span>
-                <div>
-                  <h2>Abgabe erstellen</h2>
-                  <p>Beide Bilder werden in eine einzelne HTML-Datei gepackt.</p>
-                </div>
+              <div className="summary-list">
+                <SummaryRow label="Type" value={tripType} />
+                <SummaryRow label="Name" value={name || "-"} />
+                <SummaryRow label="BAC" value={bacValue || "-"} />
+                <SummaryRow label="Date" value={formatDisplayDate(reportData.dateTime)} />
+                <SummaryRow label="Time" value={formatDisplayTime(reportData.dateTime)} />
               </div>
 
               <div className="review-grid">
-                <PhotoPreview file={personPhoto} onRetake={() => setCurrentStep("person")} title="Person" />
-                <PhotoPreview file={devicePhoto} onRetake={() => setCurrentStep("device")} title="Geraet" />
+                <PhotoPreview file={personPhoto} onRetake={() => setCurrentStep("photos")} title="Person photo" />
+                <PhotoPreview file={bacPhoto} onRetake={() => setCurrentStep("photos")} title="BAC meter photo" />
               </div>
 
-              <label>
-                Notiz
-                <textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Optional" />
-              </label>
-
-              {status && <p className={packageFile ? "success" : "info"}>{status}</p>}
+              {status && <p className={reportFile ? "success" : "info"}>{status}</p>}
 
               <div className="action-grid">
                 <button className="primary-button" disabled={!canCreate || busy} type="submit">
-                  <FileText size={20} />
-                  {busy ? "Erstelle..." : "Datei erstellen"}
+                  <Download size={20} />
+                  {busy ? "Creating..." : "Create report file"}
                 </button>
-                {packageFile && (
-                  <>
-                    <a className="primary-button download-button" download={packageFile.name} href={packageFile.url}>
-                      <Download size={20} />
-                      Datei laden
-                    </a>
-                    <button className="secondary-button" onClick={openEmailDraft} type="button">
-                      <Mail size={20} />
-                      E-Mail oeffnen
-                    </button>
-                  </>
-                )}
+                <button className="secondary-button" disabled={!reportFile} onClick={shareReport} type="button">
+                  <Share2 size={20} />
+                  Share file
+                </button>
+                <button className="secondary-button" onClick={openEmailDraft} type="button">
+                  <Mail size={20} />
+                  Open email
+                </button>
               </div>
             </section>
           )}
 
           <div className="footer-actions">
-            {currentStep !== "person" && (
-              <button className="text-button" onClick={() => setCurrentStep(currentStep === "send" ? "device" : "person")} type="button">
-                Zurueck
+            {currentStep !== "details" && (
+              <button className="text-button" onClick={() => setCurrentStep(currentStep === "send" ? "photos" : "details")} type="button">
+                Back
               </button>
             )}
             <button className="text-button" onClick={resetFlow} type="button">
               <RotateCcw size={16} />
-              Neu starten
+              Reset
             </button>
           </div>
         </form>
 
         <section className="notice">
-          <Send size={20} />
-          <p>
-            GitHub Pages kann keine Anhaenge automatisch versenden. Deshalb zuerst die Datei herunterladen und danach an die geoeffnete E-Mail
-            anhaengen.
-          </p>
+          <Mail size={20} />
+          <p>The email subject and body are prepared automatically. Static GitHub Pages cannot silently attach and send files without an email app.</p>
         </section>
       </section>
     </main>
@@ -223,28 +246,20 @@ function StepPill({ label, active, done }) {
   );
 }
 
-function CameraStep({ capture, detail, file, inputId, onChange, onNext, step, title }) {
+function CameraStep({ capture, file, inputId, onChange, title }) {
   const preview = useObjectUrl(file);
 
   return (
-    <section className="camera-step">
-      <div className="simple-heading">
-        <span>{step}</span>
-        <div>
-          <h2>{title}</h2>
-          <p>{detail}</p>
-        </div>
+    <section className="camera-step compact-camera">
+      <div className="camera-step-title">
+        <h2>{title}</h2>
+        {file && <span>Ready</span>}
       </div>
-      <div className="camera-preview">{preview ? <img alt="" src={preview} /> : <Camera size={54} />}</div>
+      <div className="camera-preview">{preview ? <img alt="" src={preview} /> : <Camera size={48} />}</div>
       <label className="camera-button secondary-camera" htmlFor={inputId}>
         <Camera size={24} />
-        <span>{file ? "Nochmal aufnehmen" : "Kamera oeffnen"}</span>
+        <span>{file ? "Retake photo" : "Open camera"}</span>
       </label>
-      {file && (
-        <button className="primary-button wide big-next" onClick={onNext} type="button">
-          Weiter
-        </button>
-      )}
       <input
         accept="image/*"
         capture={capture}
@@ -265,9 +280,18 @@ function PhotoPreview({ file, onRetake, title }) {
       <div>{preview ? <img alt="" src={preview} /> : <Camera size={28} />}</div>
       <strong>{title}</strong>
       <button onClick={onRetake} type="button">
-        Aendern
+        Change
       </button>
     </article>
+  );
+}
+
+function SummaryRow({ label, value }) {
+  return (
+    <div className="summary-row">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
   );
 }
 
@@ -275,70 +299,78 @@ function useObjectUrl(file) {
   return useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
 }
 
-function fileToDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
+function buildEmailSubject(data) {
+  return `${data.tripType} alcohol check - ${data.name || "Unknown"} - ${formatFileDate(data.dateTime)}`;
 }
 
-function buildSubmissionHtml(submission) {
-  const created = new Date(submission.createdAt).toLocaleString("de-DE");
+function buildEmailBody(data) {
+  return [
+    "Hello App Maintainer,",
+    "",
+    "Please find the alcohol check details below.",
+    "",
+    `Check type: ${data.tripType}`,
+    `Name: ${data.name}`,
+    `Date: ${formatDisplayDate(data.dateTime)}`,
+    `Time: ${formatDisplayTime(data.dateTime)}`,
+    `BAC value: ${data.bacValue}`,
+    "",
+    "Photo files:",
+    `Person photo: ${data.personPhotoName}`,
+    `BAC meter photo: ${data.bacPhotoName}`,
+    "",
+    data.note ? `Notes: ${data.note}` : "Notes: -",
+    "",
+    "The lightweight report file was created by ProofFlow."
+  ].join("\n");
+}
 
-  return `<!doctype html>
-<html lang="de">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Foto-Abgabe ${escapeHtml(submission.identifier)}</title>
-  <style>
-    body { color: #172026; font-family: Arial, sans-serif; margin: 0; padding: 24px; }
-    h1 { margin: 0 0 8px; }
-    dl { display: grid; gap: 8px; grid-template-columns: 120px 1fr; margin: 24px 0; }
-    dt { color: #52676b; font-weight: 700; }
-    dd { margin: 0; }
-    .photos { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
-    figure { border: 1px solid #d6e0de; border-radius: 8px; margin: 0; padding: 12px; }
-    img { display: block; max-width: 100%; width: 100%; }
-    figcaption { color: #52676b; font-weight: 700; margin-top: 10px; }
-    .note { background: #f3f7f6; border-radius: 8px; padding: 14px; white-space: pre-wrap; }
-  </style>
-</head>
-<body>
-  <h1>Foto-Abgabe</h1>
-  <p>Erstellt am ${escapeHtml(created)}</p>
-  <dl>
-    <dt>Name</dt><dd>${escapeHtml(submission.name)}</dd>
-    <dt>Kennung</dt><dd>${escapeHtml(submission.identifier)}</dd>
-    <dt>Notiz</dt><dd>${submission.note ? `<div class="note">${escapeHtml(submission.note)}</div>` : "Keine Notiz"}</dd>
-  </dl>
-  <section class="photos">
-    <figure>
-      <img alt="Person" src="${submission.personPhoto}">
-      <figcaption>Person: ${escapeHtml(submission.personPhotoName)}</figcaption>
-    </figure>
-    <figure>
-      <img alt="Geraet" src="${submission.devicePhoto}">
-      <figcaption>Geraet: ${escapeHtml(submission.devicePhotoName)}</figcaption>
-    </figure>
-  </section>
-</body>
-</html>`;
+function buildReportText(data) {
+  return [
+    "PROOFFLOW ALCOHOL CHECK REPORT",
+    "================================",
+    "",
+    `Recipient: ${RECIPIENT_EMAIL}`,
+    `Check type: ${data.tripType}`,
+    `Name: ${data.name}`,
+    `Date: ${formatDisplayDate(data.dateTime)}`,
+    `Time: ${formatDisplayTime(data.dateTime)}`,
+    `BAC value: ${data.bacValue}`,
+    "",
+    "Photos",
+    "------",
+    `Person photo: ${data.personPhotoName}`,
+    `BAC meter photo: ${data.bacPhotoName}`,
+    "",
+    "Notes",
+    "-----",
+    data.note || "-"
+  ].join("\n");
+}
+
+function downloadUrl(url, fileName) {
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.append(link);
+  link.click();
+  link.remove();
 }
 
 function safeFilePart(value) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "abgabe";
+  return String(value).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "check";
 }
 
-function escapeHtml(value) {
-  return String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
+function formatFileDate(date) {
+  return date.toISOString().slice(0, 16).replace("T", "-").replace(":", "");
+}
+
+function formatDisplayDate(date) {
+  return date.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function formatDisplayTime(date) {
+  return date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 }
 
 createRoot(document.getElementById("root")).render(<App />);
