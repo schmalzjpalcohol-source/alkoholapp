@@ -1009,7 +1009,7 @@ textarea {
 }
 
 .summary-row {
-  align-items: center;
+  align-items: flex-start;
   border-bottom: 1px solid #d6e0de;
   display: flex;
   gap: 12px;
@@ -1030,6 +1030,8 @@ textarea {
 
 .summary-row strong {
   color: #172026;
+  line-height: 1.25;
+  max-width: 68%;
   overflow-wrap: anywhere;
   text-align: right;
 }

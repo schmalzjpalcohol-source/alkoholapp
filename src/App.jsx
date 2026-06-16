@@ -21,6 +21,7 @@ function App() {
 
   const canContinueDetails = name.trim() && bacValue.trim();
   const canCreate = canContinueDetails && personPhoto && bacPhoto;
+  const emailSubject = buildEmailSubject(reportData);
 
   useEffect(() => {
     pageRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
@@ -73,7 +74,7 @@ function App() {
       url
     });
     downloadUrl(url, emailName);
-    setStatus("Email file created with the report and both photos attached.");
+    setStatus(`Email file created for ${RECIPIENT_EMAIL}. Subject: ${buildEmailSubject(currentReportData)}`);
     setBusy(false);
   }
 
@@ -221,6 +222,8 @@ function App() {
           {currentStep === "send" && (
             <section className="review-screen">
               <div className="summary-list">
+                <SummaryRow label="To" value={RECIPIENT_EMAIL} />
+                <SummaryRow label="Subject" value={emailSubject} />
                 <SummaryRow label="Type" value={tripType} />
                 <SummaryRow label="Name" value={name || "-"} />
                 <SummaryRow label="BAC" value={bacValue || "-"} />
