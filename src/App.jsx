@@ -1,4 +1,4 @@
-import { Camera, CheckCircle2, Download, Gauge, Mail, RotateCcw, Share2, ShieldCheck } from "lucide-react";
+import { Camera, CheckCircle2, Download, Gauge, Mail, RotateCcw, Send, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
@@ -241,8 +241,8 @@ function App() {
                   {busy ? "Creating..." : "Create email file"}
                 </button>
                 <button className="secondary-button" disabled={!reportFile} onClick={shareReport} type="button">
-                  <Share2 size={20} />
-                  Share email file
+                  <Send size={20} />
+                  Send email
                 </button>
               </div>
             </section>
@@ -263,7 +263,7 @@ function App() {
 
         <section className="notice">
           <Mail size={20} />
-          <p>Create email file downloads a prepared email with the report, person photo, and BAC meter photo attached.</p>
+          <p>Create email file first, then tap Send email to open/share the prepared message with all attachments.</p>
         </section>
       </section>
     </main>
