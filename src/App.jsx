@@ -1,11 +1,12 @@
 import { Camera, CheckCircle2, Download, Gauge, Mail, RotateCcw, Share2, ShieldCheck } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 
 const RECIPIENT_EMAIL = "recipient@example.invalid";
 
 function App() {
+  const pageRef = useRef(null);
   const [tripType, setTripType] = useState("Departure");
   const [name, setName] = useState("");
   const [bacValue, setBacValue] = useState("");
@@ -20,6 +21,10 @@ function App() {
 
   const canContinueDetails = name.trim() && bacValue.trim();
   const canCreate = canContinueDetails && personPhoto && bacPhoto;
+
+  useEffect(() => {
+    pageRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+  }, [currentStep]);
 
   const reportData = useMemo(
     () => ({
@@ -47,22 +52,28 @@ function App() {
     const timestamp = new Date();
     const currentReportData = { ...reportData, dateTime: timestamp };
     const reportText = buildReportText(currentReportData);
-    const fileName = `proofflow-${safeFilePart(tripType)}-${safeFilePart(name)}-${formatFileDate(timestamp)}.txt`;
-    const blob = new Blob([reportText], { type: "text/plain;charset=utf-8" });
-    const file = new File([blob], fileName, { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
+    const fileStamp = formatFileDate(timestamp);
+    const reportName = `proofflow-report-${safeFilePart(tripType)}-${safeFilePart(name)}-${fileStamp}.txt`;
+    const emailName = `proofflow-email-${safeFilePart(tripType)}-${safeFilePart(name)}-${fileStamp}.eml`;
+    const reportFileForAttachment = new File([reportText], reportName, { type: "text/plain" });
+    const personFile = renamePhotoFile(personPhoto, `person-photo-${fileStamp}`);
+    const bacFile = renamePhotoFile(bacPhoto, `bac-meter-photo-${fileStamp}`);
+    const emailText = await buildEmlMessage(currentReportData, [reportFileForAttachment, personFile, bacFile]);
+    const emailBlob = new Blob([emailText], { type: "message/rfc822;charset=utf-8" });
+    const emailFile = new File([emailBlob], emailName, { type: "message/rfc822" });
+    const url = URL.createObjectURL(emailBlob);
 
     if (reportFile?.url) URL.revokeObjectURL(reportFile.url);
     setCreatedAt(timestamp);
     setReportFile({
-      file,
-      files: [file, renamePhotoFile(personPhoto, `person-photo-${formatFileDate(timestamp)}`), renamePhotoFile(bacPhoto, `bac-meter-photo-${formatFileDate(timestamp)}`)],
-      name: fileName,
-      text: reportText,
+      file: emailFile,
+      files: [emailFile],
+      name: emailName,
+      text: emailText,
       url
     });
-    downloadUrl(url, fileName);
-    setStatus("Report file created. Share the report together with both photos.");
+    downloadUrl(url, emailName);
+    setStatus("Email file created with the report and both photos attached.");
     setBusy(false);
   }
 
@@ -79,14 +90,22 @@ function App() {
       return;
     }
 
-    setStatus("Your browser cannot attach files automatically. Open email and attach the report plus both photos.");
-    openEmailDraft();
+    setStatus("Your browser cannot share the email file directly. Open the downloaded .eml file from Files/Mail.");
   }
 
-  function openEmailDraft() {
-    const subject = encodeURIComponent(buildEmailSubject(reportData));
-    const body = encodeURIComponent(buildEmailBody(reportData));
-    window.location.href = `mailto:${RECIPIENT_EMAIL}?subject=${subject}&body=${body}`;
+  function goToStep(step) {
+    setCurrentStep(step);
+    requestAnimationFrame(() => pageRef.current?.scrollIntoView({ block: "start", behavior: "smooth" }));
+  }
+
+  function updatePersonPhoto(file) {
+    setPersonPhoto(file);
+    requestAnimationFrame(() => pageRef.current?.scrollIntoView({ block: "start", behavior: "smooth" }));
+  }
+
+  function updateBacPhoto(file) {
+    setBacPhoto(file);
+    requestAnimationFrame(() => pageRef.current?.scrollIntoView({ block: "start", behavior: "smooth" }));
   }
 
   function resetFlow() {
@@ -105,7 +124,7 @@ function App() {
 
   return (
     <main className="app-shell">
-      <section className="page mobile-page">
+      <section className="page mobile-page" ref={pageRef}>
         <header className="hero compact-hero">
           <div className="hero-copy">
             <div className="brand-line">
@@ -171,7 +190,7 @@ function App() {
                 <textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Optional" />
               </label>
 
-              <button className="primary-button wide big-next" disabled={!canContinueDetails} onClick={() => setCurrentStep("photos")} type="button">
+              <button className="primary-button wide big-next" disabled={!canContinueDetails} onClick={() => goToStep("photos")} type="button">
                 Continue
               </button>
             </section>
@@ -183,17 +202,17 @@ function App() {
                 capture="user"
                 file={personPhoto}
                 inputId="person-photo"
-                onChange={setPersonPhoto}
+                onChange={updatePersonPhoto}
                 title="Person photo"
               />
               <CameraStep
                 capture="environment"
                 file={bacPhoto}
                 inputId="bac-photo"
-                onChange={setBacPhoto}
+                onChange={updateBacPhoto}
                 title="BAC meter photo"
               />
-              <button className="primary-button wide big-next" disabled={!personPhoto || !bacPhoto} onClick={() => setCurrentStep("send")} type="button">
+              <button className="primary-button wide big-next" disabled={!personPhoto || !bacPhoto} onClick={() => goToStep("send")} type="button">
                 Review
               </button>
             </section>
@@ -210,8 +229,8 @@ function App() {
               </div>
 
               <div className="review-grid">
-                <PhotoPreview file={personPhoto} onRetake={() => setCurrentStep("photos")} title="Person photo" />
-                <PhotoPreview file={bacPhoto} onRetake={() => setCurrentStep("photos")} title="BAC meter photo" />
+                <PhotoPreview file={personPhoto} onRetake={() => goToStep("photos")} title="Person photo" />
+                <PhotoPreview file={bacPhoto} onRetake={() => goToStep("photos")} title="BAC meter photo" />
               </div>
 
               {status && <p className={reportFile ? "success" : "info"}>{status}</p>}
@@ -219,15 +238,11 @@ function App() {
               <div className="action-grid">
                 <button className="primary-button" disabled={!canCreate || busy} type="submit">
                   <Download size={20} />
-                  {busy ? "Creating..." : "Create report"}
+                  {busy ? "Creating..." : "Create email file"}
                 </button>
                 <button className="secondary-button" disabled={!reportFile} onClick={shareReport} type="button">
                   <Share2 size={20} />
-                  Share report + photos
-                </button>
-                <button className="secondary-button" onClick={openEmailDraft} type="button">
-                  <Mail size={20} />
-                  Open email
+                  Share email file
                 </button>
               </div>
             </section>
@@ -235,7 +250,7 @@ function App() {
 
           <div className="footer-actions">
             {currentStep !== "details" && (
-              <button className="text-button" onClick={() => setCurrentStep(currentStep === "send" ? "photos" : "details")} type="button">
+              <button className="text-button" onClick={() => goToStep(currentStep === "send" ? "photos" : "details")} type="button">
                 Back
               </button>
             )}
@@ -248,7 +263,7 @@ function App() {
 
         <section className="notice">
           <Mail size={20} />
-          <p>Use Share report + photos on mobile to send the report and both image files. Email text and subject are prepared automatically.</p>
+          <p>Create email file downloads a prepared email with the report, person photo, and BAC meter photo attached.</p>
         </section>
       </section>
     </main>
@@ -366,6 +381,39 @@ function buildReportText(data) {
   ].join("\n");
 }
 
+async function buildEmlMessage(data, attachments) {
+  const boundary = `proofflow-${crypto.randomUUID()}`;
+  const subject = buildEmailSubject(data);
+  const body = buildEmailBody(data);
+  const encodedAttachments = await Promise.all(attachments.map(async (file) => ({ file, base64: await fileToBase64(file) })));
+
+  return [
+    `To: ${RECIPIENT_EMAIL}`,
+    `Subject: ${sanitizeHeader(subject)}`,
+    `Date: ${data.dateTime.toUTCString()}`,
+    "MIME-Version: 1.0",
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    "",
+    `--${boundary}`,
+    'Content-Type: text/plain; charset="UTF-8"',
+    "Content-Transfer-Encoding: 8bit",
+    "",
+    body,
+    "",
+    ...encodedAttachments.flatMap(({ file, base64 }) => [
+      `--${boundary}`,
+      `Content-Type: ${file.type || "application/octet-stream"}; name="${sanitizeHeader(file.name)}"`,
+      "Content-Transfer-Encoding: base64",
+      `Content-Disposition: attachment; filename="${sanitizeHeader(file.name)}"`,
+      "",
+      wrapBase64(base64),
+      ""
+    ]),
+    `--${boundary}--`,
+    ""
+  ].join("\r\n");
+}
+
 function downloadUrl(url, fileName) {
   const link = document.createElement("a");
   link.href = url;
@@ -378,6 +426,26 @@ function downloadUrl(url, fileName) {
 function renamePhotoFile(file, baseName) {
   const extension = getFileExtension(file.name) || imageExtensionFromType(file.type);
   return new File([file], `${baseName}${extension}`, { type: file.type || "image/jpeg" });
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      resolve(result.includes(",") ? result.split(",")[1] : result);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function wrapBase64(value) {
+  return String(value).replace(/.{1,76}/g, "$&\r\n").trimEnd();
+}
+
+function sanitizeHeader(value) {
+  return String(value).replace(/[\r\n"]/g, " ").trim();
 }
 
 function getFileExtension(fileName) {
