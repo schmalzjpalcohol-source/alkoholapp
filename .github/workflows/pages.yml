@@ -1,4 +1,4 @@
-name: Build GitHub Pages
+name: Check GitHub Pages Build
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -27,13 +27,3 @@ jobs:
 
       - name: Build
         run: npm run build:pages
-
-      - name: Disable Jekyll
-        run: touch dist/.nojekyll
-
-      - name: Publish to gh-pages branch
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-          publish_branch: gh-pages
