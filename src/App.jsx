@@ -4,13 +4,13 @@ import { createRoot } from "react-dom/client";
 import "./styles.css";
 
 const TRIP_TYPES = [
-  { value: "departure", label: "出発", automationKey: "DEPARTURE" },
-  { value: "arrival", label: "到着", automationKey: "ARRIVAL" }
+  { value: "beforeWork", label: "業務前" },
+  { value: "afterWork", label: "業務後" }
 ];
 
 function App() {
   const pageRef = useRef(null);
-  const [tripType, setTripType] = useState("departure");
+  const [tripType, setTripType] = useState("beforeWork");
   const [name, setName] = useState("");
   const [bacValue, setBacValue] = useState("");
   const [note, setNote] = useState("");
@@ -22,8 +22,9 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
 
-  const canContinueDetails = name.trim() && bacValue.trim();
-  const canCreate = canContinueDetails && personPhoto && bacPhoto;
+  const canContinueDetails = name.trim();
+  const canContinuePhotos = personPhoto && bacPhoto && bacValue.trim();
+  const canCreate = canContinueDetails && canContinuePhotos;
 
   useEffect(() => {
     pageRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
@@ -64,7 +65,7 @@ function App() {
   async function sendEmail(event) {
     event.preventDefault();
     if (!canCreate) {
-      setStatus("必須項目を入力し、2枚の写真を撮影してください。");
+      setStatus("必須項目を入力し、2枚の写真を撮影して、BAC値を入力してください。");
       return;
     }
 
@@ -114,7 +115,7 @@ function App() {
 
   function resetFlow() {
     if (reportFile?.url) URL.revokeObjectURL(reportFile.url);
-    setTripType("departure");
+    setTripType("beforeWork");
     setName("");
     setBacValue("");
     setNote("");
@@ -136,7 +137,7 @@ function App() {
               <span>ProofFlow</span>
             </div>
             <h1>アルコールチェック</h1>
-            <p>出発・到着時のアルコール確認を送信します。</p>
+            <p>業務前・業務後のアルコール確認を送信します。</p>
           </div>
           <div className="hero-visual" aria-hidden="true">
             <div className="meter-card">
@@ -153,9 +154,9 @@ function App() {
 
         <form className="submission-panel" onSubmit={sendEmail}>
           <div className="flow-progress">
-            <StepPill active={currentStep === "details"} done={canContinueDetails} label="1. 入力" />
-            <StepPill active={currentStep === "photos"} done={Boolean(personPhoto && bacPhoto)} label="2. 写真" />
-            <StepPill active={currentStep === "send"} done={Boolean(personPhoto && bacPhoto)} label="3. 送信" />
+            <StepPill active={currentStep === "details"} done={canContinueDetails} label="1. 基本情報" />
+            <StepPill active={currentStep === "photos"} done={Boolean(canContinuePhotos)} label="2. 写真・数値" />
+            <StepPill active={currentStep === "send"} done={Boolean(canCreate)} label="3. 送信" />
           </div>
 
           {currentStep === "details" && (
@@ -174,24 +175,8 @@ function App() {
               </div>
 
               <label>
-                氏名
-                <input autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} placeholder="氏名を入力" required />
-              </label>
-
-              <label>
-                BAC値
-                <input
-                  inputMode="decimal"
-                  value={bacValue}
-                  onChange={(event) => setBacValue(event.target.value)}
-                  placeholder="0.00"
-                  required
-                />
-              </label>
-
-              <label>
-                備考
-                <textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="任意" />
+                短縮名
+                <input autoComplete="nickname" value={name} onChange={(event) => setName(event.target.value)} placeholder="短縮名を入力" required />
               </label>
 
               <button className="primary-button wide big-next" disabled={!canContinueDetails} onClick={() => goToStep("photos")} type="button">
@@ -216,7 +201,24 @@ function App() {
                 onChange={updateBacPhoto}
                 title="アルコール検知器の写真"
               />
-              <button className="primary-button wide big-next" disabled={!personPhoto || !bacPhoto} onClick={() => goToStep("send")} type="button">
+
+              <label>
+                BAC値
+                <input
+                  inputMode="decimal"
+                  value={bacValue}
+                  onChange={(event) => setBacValue(event.target.value)}
+                  placeholder="0.00"
+                  required
+                />
+              </label>
+
+              <label>
+                備考
+                <textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="任意" />
+              </label>
+
+              <button className="primary-button wide big-next" disabled={!canContinuePhotos} onClick={() => goToStep("send")} type="button">
                 確認する
               </button>
             </section>
@@ -227,7 +229,7 @@ function App() {
               <div className="summary-list">
                 <SummaryRow label="件名" value={emailSubject} />
                 <SummaryRow label="種別" value={getTripTypeLabel(tripType)} />
-                <SummaryRow label="氏名" value={name || "-"} />
+                <SummaryRow label="短縮名" value={name || "-"} />
                 <SummaryRow label="BAC値" value={bacValue || "-"} />
                 <SummaryRow label="日付" value={formatDisplayDate(reportData.dateTime)} />
                 <SummaryRow label="時刻" value={formatDisplayTime(reportData.dateTime)} />
@@ -336,7 +338,7 @@ function useObjectUrl(file) {
 
 function buildEmailSubject(data) {
   const trip = getTripType(data.tripType);
-  return `【アルコールチェック】【${trip.label}】【${trip.automationKey}】【${formatSubjectDate(data.dateTime)}】【${data.name || "氏名未入力"}】【BAC:${data.bacValue || "-"}】`;
+  return `【アルコールチェック】【${trip.label}】【${formatSubjectDate(data.dateTime)}】【${data.name || "短縮名未入力"}】【BAC:${data.bacValue || "-"}】`;
 }
 
 function buildEmailBody(data) {
@@ -347,7 +349,7 @@ function buildEmailBody(data) {
     "",
     `件名: ${buildEmailSubject(data)}`,
     `種別: ${getTripTypeLabel(data.tripType)}`,
-    `氏名: ${data.name}`,
+    `短縮名: ${data.name}`,
     `日付: ${formatDisplayDate(data.dateTime)}`,
     `時刻: ${formatDisplayTime(data.dateTime)}`,
     `BAC値: ${data.bacValue}`,
@@ -383,7 +385,7 @@ async function buildReportPdf(data, personPhoto, bacPhoto, fileName) {
   const rows = [
     ["件名", buildEmailSubject(data)],
     ["種別", getTripTypeLabel(data.tripType)],
-    ["氏名", data.name || "-"],
+    ["短縮名", data.name || "-"],
     ["日付", formatDisplayDate(data.dateTime)],
     ["時刻", formatDisplayTime(data.dateTime)],
     ["BAC値", data.bacValue || "-"],
