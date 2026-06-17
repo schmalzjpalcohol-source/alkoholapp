@@ -400,25 +400,25 @@ async function buildReportPdf(data, personPhoto, bacPhoto, fileName) {
 
   rows.forEach(([label, value]) => {
     context.fillStyle = "#eef3f2";
-    context.fillRect(72, y, 1096, 68);
+    context.fillRect(72, y, 1096, 58);
     context.fillStyle = "#52676b";
-    context.font = "700 24px -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif";
-    context.fillText(label, 96, y + 42);
+    context.font = "700 22px -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif";
+    context.fillText(label, 96, y + 37);
     context.fillStyle = "#172026";
-    context.font = "500 25px -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif";
-    drawWrappedText(context, String(value), 270, y + 34, 860, 29, 2);
-    y += 78;
+    context.font = "500 23px -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif";
+    drawWrappedText(context, String(value), 270, y + 31, 860, 27, 2);
+    y += 64;
   });
 
-  y += 36;
+  y += 16;
   context.fillStyle = "#172026";
   context.font = "700 34px -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif";
   context.fillText("写真", 72, y);
-  y += 34;
+  y += 28;
 
   const [personImage, bacImage] = await Promise.all([loadImageFromFile(personPhoto), loadImageFromFile(bacPhoto)]);
-  drawPhotoBlock(context, personImage, "本人写真", 72, y, 520, 390);
-  drawPhotoBlock(context, bacImage, "アルコール検知器の写真", 648, y, 520, 390);
+  drawPhotoBlock(context, personImage, "本人写真", 72, y, 1096, 380);
+  drawPhotoBlock(context, bacImage, "アルコール検知器の写真", 72, y + 408, 1096, 380);
 
   context.fillStyle = "#66777d";
   context.font = "400 20px -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif";
