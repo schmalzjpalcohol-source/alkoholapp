@@ -5,8 +5,8 @@ import "./styles.css";
 
 const RECIPIENT_EMAIL = "recipient@example.invalid";
 const TRIP_TYPES = [
-  { value: "departure", label: "出発" },
-  { value: "arrival", label: "到着" }
+  { value: "departure", label: "出発", automationKey: "DEPARTURE" },
+  { value: "arrival", label: "到着", automationKey: "ARRIVAL" }
 ];
 
 function App() {
@@ -51,11 +51,14 @@ function App() {
 
     const currentReportData = { ...reportData, dateTime: timestamp };
     const fileStamp = formatFileDate(timestamp);
-    const reportName = `alcohol-check-${safeFilePart(tripType)}-${safeFilePart(name)}-${fileStamp}.pdf`;
-    const reportPdf = await buildReportPdf(currentReportData, personPhoto, bacPhoto, reportName);
+    const typeLabel = getTripTypeLabel(tripType);
+    const baseName = `alcohol-check-${typeLabel}-${safeFilePart(name)}-${fileStamp}`;
+    const reportPdf = await buildReportPdf(currentReportData, personPhoto, bacPhoto, `${baseName}.pdf`);
+    const personImage = renamePhotoFile(personPhoto, `${baseName}-本人写真`);
+    const bacImage = renamePhotoFile(bacPhoto, `${baseName}-検知器写真`);
     return {
       data: currentReportData,
-      files: [reportPdf]
+      files: [reportPdf, personImage, bacImage]
     };
   }
 
@@ -83,13 +86,13 @@ function App() {
           title: buildEmailSubject(packageData.data),
           text: buildEmailBody(packageData.data)
         });
-        setStatus(`宛先: ${RECIPIENT_EMAIL} / 件名: ${buildEmailSubject(packageData.data)}`);
+        setStatus(`Outlook件名: ${buildEmailSubject(packageData.data)}`);
         return;
       }
 
-      setStatus("このブラウザではファイルを添付できません。iPhoneのSafariで開き直して、もう一度「メールを送信」を押してください。");
+      setStatus("このブラウザではファイルを添付できません。iPhoneのSafariまたはOutlookアプリから開き直して、もう一度「Outlookで送信」を押してください。");
     } catch {
-      setStatus("メール共有がキャンセルされました。もう一度「メールを送信」を押してください。");
+      setStatus("メール共有がキャンセルされました。もう一度「Outlookで送信」を押してください。");
     } finally {
       setBusy(false);
     }
@@ -242,9 +245,10 @@ function App() {
               <div className="action-grid">
                 <button className="primary-button" disabled={!canCreate || busy} type="submit">
                   <Send size={20} />
-                  {busy ? "準備中..." : "メールを送信"}
+                  {busy ? "準備中..." : "Outlookで送信"}
                 </button>
               </div>
+              <p className="attachment-note">添付: PDF報告書、本人写真、検知器写真</p>
             </section>
           )}
 
@@ -263,7 +267,7 @@ function App() {
 
         <section className="notice">
           <Mail size={20} />
-          <p>「メールを送信」を押すと、入力内容と2枚の写真を含むPDFを添付した状態でiPhoneの共有画面が開きます。メールアプリを選んで送信してください。</p>
+          <p>Outlookの自動仕分け用に件名は固定形式です。送信時はPDF報告書に加えて、本人写真と検知器写真も別ファイルで添付されます。</p>
         </section>
       </section>
     </main>
@@ -333,7 +337,8 @@ function useObjectUrl(file) {
 }
 
 function buildEmailSubject(data) {
-  return `アルコールチェック報告（${getTripTypeLabel(data.tripType)}） - ${data.name || "氏名未入力"} - ${formatFileDate(data.dateTime)}`;
+  const trip = getTripType(data.tripType);
+  return `【アルコールチェック】【${trip.label}】【${trip.automationKey}】【${formatSubjectDate(data.dateTime)}】【${data.name || "氏名未入力"}】【BAC:${data.bacValue || "-"}】`;
 }
 
 function buildEmailBody(data) {
@@ -342,6 +347,7 @@ function buildEmailBody(data) {
     "",
     "アルコールチェックの内容を送付します。",
     "",
+    `件名: ${buildEmailSubject(data)}`,
     `種別: ${getTripTypeLabel(data.tripType)}`,
     `氏名: ${data.name}`,
     `日付: ${formatDisplayDate(data.dateTime)}`,
@@ -349,11 +355,11 @@ function buildEmailBody(data) {
     `BAC値: ${data.bacValue}`,
     "",
     "添付ファイル:",
-    "アルコールチェック報告書PDF（入力内容と2枚の写真を含む）",
+    "1. PDF報告書（入力内容と2枚の写真を含む）",
+    "2. 本人写真",
+    "3. アルコール検知器の写真",
     "",
-    data.note ? `備考: ${data.note}` : "備考: -",
-    "",
-    "PDFレポートに内容と2枚の写真が含まれています。"
+    data.note ? `備考: ${data.note}` : "備考: -"
   ].join("\n");
 }
 
@@ -378,6 +384,7 @@ async function buildReportPdf(data, personPhoto, bacPhoto, fileName) {
 
   const rows = [
     ["宛先", RECIPIENT_EMAIL],
+    ["件名", buildEmailSubject(data)],
     ["種別", getTripTypeLabel(data.tripType)],
     ["氏名", data.name || "-"],
     ["日付", formatDisplayDate(data.dateTime)],
@@ -394,14 +401,14 @@ async function buildReportPdf(data, personPhoto, bacPhoto, fileName) {
 
   rows.forEach(([label, value]) => {
     context.fillStyle = "#eef3f2";
-    context.fillRect(72, y, 1096, 62);
+    context.fillRect(72, y, 1096, 68);
     context.fillStyle = "#52676b";
     context.font = "700 24px -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif";
-    context.fillText(label, 96, y + 40);
+    context.fillText(label, 96, y + 42);
     context.fillStyle = "#172026";
     context.font = "500 25px -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif";
-    drawWrappedText(context, String(value), 270, y + 40, 860, 30, 2);
-    y += 72;
+    drawWrappedText(context, String(value), 270, y + 34, 860, 29, 2);
+    y += 78;
   });
 
   y += 36;
@@ -416,7 +423,7 @@ async function buildReportPdf(data, personPhoto, bacPhoto, fileName) {
 
   context.fillStyle = "#66777d";
   context.font = "400 20px -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif";
-  context.fillText("このPDFには入力内容と2枚の写真が含まれています。", 72, 1648);
+  context.fillText("PDFに加えて、メールには2枚の写真ファイルも別添付されています。", 72, 1648);
 
   const jpegBytes = await canvasToJpegBytes(canvas, 0.72);
   const pdfBytes = createSingleImagePdf(jpegBytes, pageWidth, pageHeight);
@@ -644,15 +651,28 @@ function imageExtensionFromType(type) {
 }
 
 function getTripTypeLabel(value) {
-  return TRIP_TYPES.find((item) => item.value === value)?.label || value;
+  return getTripType(value).label;
+}
+
+function getTripType(value) {
+  return TRIP_TYPES.find((item) => item.value === value) || TRIP_TYPES[0];
 }
 
 function safeFilePart(value) {
-  return String(value).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "check";
+  return String(value).trim().replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, "-") || "check";
 }
 
 function formatFileDate(date) {
   return date.toISOString().slice(0, 16).replace("T", "-").replace(":", "");
+}
+
+function formatSubjectDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hour = String(date.getHours()).padStart(2, "0");
+  const minute = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day} ${hour}:${minute}`;
 }
 
 function formatDisplayDate(date) {

@@ -140,6 +140,14 @@ textarea {
   margin: 0;
 }
 
+.attachment-note {
+  color: #42565b;
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 12px 0 0;
+  text-align: center;
+}
+
 .login-layout {
   display: grid;
   grid-template-columns: 1.1fr 0.9fr;

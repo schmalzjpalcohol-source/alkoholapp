@@ -1,0 +1,17 @@
+{
+  "name": "アルコールチェック",
+  "short_name": "チェック",
+  "description": "出発・到着時のアルコール確認を送信します。",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#eef3f2",
+  "theme_color": "#0f766e",
+  "icons": [
+    {
+      "src": "./app-icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
