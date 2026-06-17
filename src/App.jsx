@@ -52,7 +52,7 @@ function App() {
     const currentReportData = { ...reportData, dateTime: timestamp };
     const fileStamp = formatFileDate(timestamp);
     const typeLabel = getTripTypeLabel(tripType);
-    const baseName = `alcohol-check-${typeLabel}-${safeFilePart(name)}-${fileStamp}`;
+    const baseName = `alcohol-check-${safeFilePart(name)}-${typeLabel}-${fileStamp}`;
     const reportPdf = await buildReportPdf(currentReportData, personPhoto, bacPhoto, `${baseName}.pdf`);
     const personImage = renamePhotoFile(personPhoto, `${baseName}-本人写真`);
     const bacImage = renamePhotoFile(bacPhoto, `${baseName}-検知器写真`);
@@ -175,8 +175,8 @@ function App() {
               </div>
 
               <label>
-                短縮名
-                <input autoComplete="nickname" value={name} onChange={(event) => setName(event.target.value)} placeholder="短縮名を入力" required />
+                ショートネーム
+                <input autoComplete="nickname" value={name} onChange={(event) => setName(event.target.value)} placeholder="ショートネームを入力" required />
               </label>
 
               <button className="primary-button wide big-next" disabled={!canContinueDetails} onClick={() => goToStep("photos")} type="button">
@@ -229,7 +229,7 @@ function App() {
               <div className="summary-list">
                 <SummaryRow label="件名" value={emailSubject} />
                 <SummaryRow label="種別" value={getTripTypeLabel(tripType)} />
-                <SummaryRow label="短縮名" value={name || "-"} />
+                <SummaryRow label="ショートネーム" value={name || "-"} />
                 <SummaryRow label="BrAC値" value={bacValue || "-"} />
                 <SummaryRow label="日付" value={formatDisplayDate(reportData.dateTime)} />
                 <SummaryRow label="時刻" value={formatDisplayTime(reportData.dateTime)} />
@@ -338,7 +338,7 @@ function useObjectUrl(file) {
 
 function buildEmailSubject(data) {
   const trip = getTripType(data.tripType);
-  return `【アルコールチェック】【${trip.label}】【${formatSubjectDate(data.dateTime)}】【${data.name || "短縮名未入力"}】【BrAC:${data.bacValue || "-"}】`;
+  return `【アルコールチェック報告】【${trip.label}】【${formatSubjectDate(data.dateTime)}】【${data.name || "ショートネーム未入力"}】【BrAC:${data.bacValue || "-"}】`;
 }
 
 function buildEmailBody(data) {
@@ -349,7 +349,7 @@ function buildEmailBody(data) {
     "",
     `件名: ${buildEmailSubject(data)}`,
     `種別: ${getTripTypeLabel(data.tripType)}`,
-    `短縮名: ${data.name}`,
+    `ショートネーム: ${data.name}`,
     `日付: ${formatDisplayDate(data.dateTime)}`,
     `時刻: ${formatDisplayTime(data.dateTime)}`,
     `BrAC値: ${data.bacValue}`,
@@ -385,7 +385,7 @@ async function buildReportPdf(data, personPhoto, bacPhoto, fileName) {
   const rows = [
     ["件名", buildEmailSubject(data)],
     ["種別", getTripTypeLabel(data.tripType)],
-    ["短縮名", data.name || "-"],
+    ["ショートネーム", data.name || "-"],
     ["日付", formatDisplayDate(data.dateTime)],
     ["時刻", formatDisplayTime(data.dateTime)],
     ["BrAC値", data.bacValue || "-"],
@@ -577,7 +577,12 @@ function safeFilePart(value) {
 }
 
 function formatFileDate(date) {
-  return date.toISOString().slice(0, 16).replace("T", "-").replace(":", "");
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hour = String(date.getHours()).padStart(2, "0");
+  const minute = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}-${hour}${minute}`;
 }
 
 function formatSubjectDate(date) {
