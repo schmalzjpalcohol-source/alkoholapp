@@ -65,7 +65,7 @@ function App() {
   async function sendEmail(event) {
     event.preventDefault();
     if (!canCreate) {
-      setStatus("必須項目を入力し、2枚の写真を撮影して、BAC値を入力してください。");
+      setStatus("必須項目を入力し、2枚の写真を撮影して、BrAC値を入力してください。");
       return;
     }
 
@@ -203,7 +203,7 @@ function App() {
               />
 
               <label>
-                BAC値
+                BrAC値
                 <input
                   inputMode="decimal"
                   value={bacValue}
@@ -230,7 +230,7 @@ function App() {
                 <SummaryRow label="件名" value={emailSubject} />
                 <SummaryRow label="種別" value={getTripTypeLabel(tripType)} />
                 <SummaryRow label="短縮名" value={name || "-"} />
-                <SummaryRow label="BAC値" value={bacValue || "-"} />
+                <SummaryRow label="BrAC値" value={bacValue || "-"} />
                 <SummaryRow label="日付" value={formatDisplayDate(reportData.dateTime)} />
                 <SummaryRow label="時刻" value={formatDisplayTime(reportData.dateTime)} />
               </div>
@@ -338,7 +338,7 @@ function useObjectUrl(file) {
 
 function buildEmailSubject(data) {
   const trip = getTripType(data.tripType);
-  return `【アルコールチェック】【${trip.label}】【${formatSubjectDate(data.dateTime)}】【${data.name || "短縮名未入力"}】【BAC:${data.bacValue || "-"}】`;
+  return `【アルコールチェック】【${trip.label}】【${formatSubjectDate(data.dateTime)}】【${data.name || "短縮名未入力"}】【BrAC:${data.bacValue || "-"}】`;
 }
 
 function buildEmailBody(data) {
@@ -352,7 +352,7 @@ function buildEmailBody(data) {
     `短縮名: ${data.name}`,
     `日付: ${formatDisplayDate(data.dateTime)}`,
     `時刻: ${formatDisplayTime(data.dateTime)}`,
-    `BAC値: ${data.bacValue}`,
+    `BrAC値: ${data.bacValue}`,
     "",
     "添付ファイル:",
     "1. PDF報告書（入力内容と2枚の写真を含む）",
@@ -388,7 +388,7 @@ async function buildReportPdf(data, personPhoto, bacPhoto, fileName) {
     ["短縮名", data.name || "-"],
     ["日付", formatDisplayDate(data.dateTime)],
     ["時刻", formatDisplayTime(data.dateTime)],
-    ["BAC値", data.bacValue || "-"],
+    ["BrAC値", data.bacValue || "-"],
     ["備考", data.note || "-"]
   ];
 
