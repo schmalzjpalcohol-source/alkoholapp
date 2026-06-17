@@ -3,7 +3,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 
-const RECIPIENT_EMAIL = "recipient@example.invalid";
 const TRIP_TYPES = [
   { value: "departure", label: "出発", automationKey: "DEPARTURE" },
   { value: "arrival", label: "到着", automationKey: "ARRIVAL" }
@@ -226,7 +225,6 @@ function App() {
           {currentStep === "send" && (
             <section className="review-screen">
               <div className="summary-list">
-                <SummaryRow label="宛先" value={RECIPIENT_EMAIL} />
                 <SummaryRow label="件名" value={emailSubject} />
                 <SummaryRow label="種別" value={getTripTypeLabel(tripType)} />
                 <SummaryRow label="氏名" value={name || "-"} />
@@ -383,7 +381,6 @@ async function buildReportPdf(data, personPhoto, bacPhoto, fileName) {
   context.fillText("Alcohol Check Report", 76, 142);
 
   const rows = [
-    ["宛先", RECIPIENT_EMAIL],
     ["件名", buildEmailSubject(data)],
     ["種別", getTripTypeLabel(data.tripType)],
     ["氏名", data.name || "-"],
@@ -549,94 +546,9 @@ function totalLength(chunks) {
   return chunks.reduce((sum, chunk) => sum + chunk.length, 0);
 }
 
-function buildReportText(data) {
-  return [
-    "PROOFFLOW アルコールチェック レポート",
-    "====================================",
-    "",
-    `宛先: ${RECIPIENT_EMAIL}`,
-    `種別: ${getTripTypeLabel(data.tripType)}`,
-    `氏名: ${data.name}`,
-    `日付: ${formatDisplayDate(data.dateTime)}`,
-    `時刻: ${formatDisplayTime(data.dateTime)}`,
-    `BAC値: ${data.bacValue}`,
-    "",
-    "写真",
-    "----",
-    `本人写真: ${data.personPhotoName}`,
-    `アルコール検知器の写真: ${data.bacPhotoName}`,
-    "",
-    "備考",
-    "----",
-    data.note || "-"
-  ].join("\n");
-}
-
-async function buildEmlMessage(data, attachments) {
-  const boundary = `proofflow-${crypto.randomUUID()}`;
-  const subject = buildEmailSubject(data);
-  const body = buildEmailBody(data);
-  const encodedAttachments = await Promise.all(attachments.map(async (file) => ({ file, base64: await fileToBase64(file) })));
-
-  return [
-    `To: ${RECIPIENT_EMAIL}`,
-    `Subject: ${sanitizeHeader(subject)}`,
-    `Date: ${data.dateTime.toUTCString()}`,
-    "MIME-Version: 1.0",
-    `Content-Type: multipart/mixed; boundary="${boundary}"`,
-    "",
-    `--${boundary}`,
-    'Content-Type: text/plain; charset="UTF-8"',
-    "Content-Transfer-Encoding: 8bit",
-    "",
-    body,
-    "",
-    ...encodedAttachments.flatMap(({ file, base64 }) => [
-      `--${boundary}`,
-      `Content-Type: ${file.type || "application/octet-stream"}; name="${sanitizeHeader(file.name)}"`,
-      "Content-Transfer-Encoding: base64",
-      `Content-Disposition: attachment; filename="${sanitizeHeader(file.name)}"`,
-      "",
-      wrapBase64(base64),
-      ""
-    ]),
-    `--${boundary}--`,
-    ""
-  ].join("\r\n");
-}
-
-function downloadUrl(url, fileName) {
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  document.body.append(link);
-  link.click();
-  link.remove();
-}
-
 function renamePhotoFile(file, baseName) {
   const extension = getFileExtension(file.name) || imageExtensionFromType(file.type);
   return new File([file], `${baseName}${extension}`, { type: file.type || "image/jpeg" });
-}
-
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = String(reader.result || "");
-      resolve(result.includes(",") ? result.split(",")[1] : result);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-function wrapBase64(value) {
-  return String(value).replace(/.{1,76}/g, "$&\r\n").trimEnd();
-}
-
-function sanitizeHeader(value) {
-  return String(value).replace(/[\r\n"]/g, " ").trim();
 }
 
 function getFileExtension(fileName) {
