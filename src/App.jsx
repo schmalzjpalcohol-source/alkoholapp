@@ -54,8 +54,8 @@ function App() {
     const typeLabel = getTripTypeLabel(tripType);
     const baseName = `alcohol-check-${safeFilePart(name)}-${typeLabel}-${fileStamp}`;
     const reportPdf = await buildReportPdf(currentReportData, personPhoto, bacPhoto, `${baseName}.pdf`);
-    const personImage = renamePhotoFile(personPhoto, `${baseName}-本人写真`);
-    const bacImage = renamePhotoFile(bacPhoto, `${baseName}-検知器写真`);
+    const personImage = renamePhotoFile(personPhoto, `${baseName}-separate-本人写真`);
+    const bacImage = renamePhotoFile(bacPhoto, `${baseName}-separate-検知器写真`);
     return {
       data: currentReportData,
       files: [reportPdf, personImage, bacImage]
@@ -248,7 +248,7 @@ function App() {
                   {busy ? "準備中..." : "Outlookで送信"}
                 </button>
               </div>
-              <p className="attachment-note">添付: PDF報告書、本人写真、検知器写真</p>
+              <p className="attachment-note">別添付: PDF報告書 + separate本人写真 + separate検知器写真</p>
             </section>
           )}
 
@@ -267,7 +267,7 @@ function App() {
 
         <section className="notice">
           <Mail size={20} />
-          <p>Outlookの自動仕分け用に件名は固定形式です。送信時はPDF報告書に加えて、本人写真と検知器写真も別ファイルで添付されます。</p>
+          <p>Outlookの自動仕分け用に件名は固定形式です。送信時はPDF報告書に加えて、本人写真と検知器写真も本文ではなく別ファイルとして添付されます。</p>
         </section>
       </section>
     </main>
@@ -356,8 +356,8 @@ function buildEmailBody(data) {
     "",
     "添付ファイル:",
     "1. PDF報告書（入力内容と2枚の写真を含む）",
-    "2. 本人写真",
-    "3. アルコール検知器の写真",
+    "2. 本人写真（本文ではなく別添付）",
+    "3. アルコール検知器の写真（本文ではなく別添付）",
     "",
     data.note ? `備考: ${data.note}` : "備考: -"
   ].join("\n");
