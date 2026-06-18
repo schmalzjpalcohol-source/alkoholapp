@@ -345,6 +345,8 @@ function buildEmailSubject() {
 
 function buildEmailBody(data) {
   return [
+    EMAIL_TITLE,
+    "",
     "お疲れさまです。",
     "",
     "アルコールチェックの内容を送付します。",
