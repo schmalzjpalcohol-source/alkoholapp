@@ -427,12 +427,17 @@ async function buildReportPdf(data, personPhoto, bacPhoto, fileName) {
   y += 92;
 
   const [personImage, bacImage] = await Promise.all([loadImageFromFile(personPhoto), loadImageFromFile(bacPhoto)]);
-  drawPhotoBlock(context, personImage, "本人写真", 72, y, 536, 840);
-  drawPhotoBlock(context, bacImage, "アルコール検知器の写真", 632, y, 536, 840);
+  drawPhotoBlock(context, personImage, "本人写真", 72, y, 536, 780);
+  drawPhotoBlock(context, bacImage, "アルコール検知器の写真", 632, y, 536, 780);
 
+  context.fillStyle = "#f7faf9";
+  context.fillRect(72, 1620, 1096, 62);
+  context.strokeStyle = "#d6e0de";
+  context.lineWidth = 2;
+  context.strokeRect(72, 1620, 1096, 62);
   context.fillStyle = "#66777d";
   context.font = "400 20px -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif";
-  context.fillText("PDFに加えて、メールには2枚の写真ファイルも別添付されています。", 72, 1648);
+  context.fillText("PDFに加えて、メールには2枚の写真ファイルも別添付されています。", 96, 1658);
 
   const jpegBytes = await canvasToJpegBytes(canvas, 0.62);
   const pdfBytes = createSingleImagePdf(jpegBytes, pageWidth, pageHeight);
