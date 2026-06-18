@@ -424,57 +424,32 @@ async function renderReportVisualImage(data, rows, personImage, bacImage) {
 
   context.fillStyle = "#0f766e";
   context.fillRect(0, 0, width, 180);
-  context.fillStyle = "#ffffff";
-  context.font = "700 58px -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif";
-  context.fillText("アルコールチェック報告書", 72, 92);
-  context.font = "400 30px -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif";
-  context.fillText("Alcohol Check Report", 76, 142);
 
   let y = 250;
-  context.fillStyle = "#172026";
-  context.font = "700 34px -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif";
-  context.fillText("確認内容", 72, y);
   y += 38;
 
   rows.forEach(([label, value]) => {
     context.fillStyle = "#eef3f2";
     context.fillRect(72, y, 1096, 48);
-    context.fillStyle = "#52676b";
-    context.font = "700 20px -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif";
-    context.fillText(label, 96, y + 31);
-    context.fillStyle = "#172026";
-    context.font = "500 21px -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif";
-    drawWrappedCanvasText(context, String(value), 270, y + 28, 860, 24, 2);
     y += 54;
   });
 
   y += 10;
-  context.fillStyle = "#172026";
-  context.font = "700 34px -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif";
-  context.fillText("写真", 72, y);
   y += 26;
 
-  drawCanvasPhotoBlock(context, personImage, "本人写真", 72, y, 536, 840);
-  drawCanvasPhotoBlock(context, bacImage, "アルコール検知器の写真", 632, y, 536, 840);
-
-  context.fillStyle = "#66777d";
-  context.font = "400 20px -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif";
-  context.fillText("写真原本は添付していません。法定記録項目はこのPDFに集約されています。", 72, 1648);
+  drawCanvasPhotoBlock(context, personImage, 72, y, 536, 840);
+  drawCanvasPhotoBlock(context, bacImage, 632, y, 536, 840);
 
   const bytes = await canvasToJpegBytes(canvas, 0.72);
   return { bytes, width, height };
 }
 
-function drawCanvasPhotoBlock(context, image, title, x, y, width, height) {
+function drawCanvasPhotoBlock(context, image, x, y, width, height) {
   context.fillStyle = "#f7faf9";
   context.fillRect(x, y, width, height);
   context.strokeStyle = "#d6e0de";
   context.lineWidth = 2;
   context.strokeRect(x, y, width, height);
-
-  context.fillStyle = "#172026";
-  context.font = "700 25px -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif";
-  context.fillText(title, x + 18, y + 38);
 
   const imageBox = { x: x + 18, y: y + 58, width: width - 36, height: height - 78 };
   const scale = Math.min(imageBox.width / image.width, imageBox.height / image.height);
@@ -485,52 +460,32 @@ function drawCanvasPhotoBlock(context, image, title, x, y, width, height) {
   context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
 }
 
-function drawWrappedCanvasText(context, text, x, y, maxWidth, lineHeight, maxLines) {
-  const chars = Array.from(text);
-  let line = "";
-  let lineCount = 0;
-  chars.forEach((char, index) => {
-    const testLine = line + char;
-    const isLast = index === chars.length - 1;
-    if (context.measureText(testLine).width > maxWidth && line) {
-      context.fillText(line, x, y + lineCount * lineHeight);
-      line = char;
-      lineCount += 1;
-    } else {
-      line = testLine;
-    }
-    if (isLast && line && lineCount < maxLines) {
-      context.fillText(line, x, y + lineCount * lineHeight);
-    }
-  });
-}
-
 function createTextReportPdf({ rows, visualImage, pageWidth, pageHeight }) {
   const commands = [];
   const y = (top) => pageHeight - top;
   const add = (value) => commands.push(value);
-  const text = (value, x, top, size = 12) => {
-    add(`BT /F1 ${size} Tf 0 Tr 1 1 1 rg /GS1 gs 1 0 0 1 ${x} ${y(top)} Tm ${pdfHexString(value)} Tj ET\n`);
+  const text = (value, x, top, size = 12, color = "0.09 0.13 0.15") => {
+    add(`BT /F1 ${size} Tf 0 Tr ${color} rg 1 0 0 1 ${x} ${y(top)} Tm ${pdfHexString(value)} Tj ET\n`);
   };
   add(`q\n${pageWidth} 0 0 ${pageHeight} 0 0 cm\n/Bg Do\nQ\n`);
-  text("アルコールチェック報告書", 36, 50, 24);
-  text("Alcohol Check Report", 38, 73, 11);
-  text("確認内容", 36, 121, 16);
+  text("アルコールチェック報告書", 36, 50, 24, "1 1 1");
+  text("Alcohol Check Report", 38, 73, 11, "1 1 1");
+  text("確認内容", 36, 121, 16, "0.09 0.13 0.15");
 
   let top = 138;
   rows.forEach(([label, value]) => {
-    text(label, 48, top + 18, 9);
+    text(label, 48, top + 18, 9, "0.32 0.40 0.42");
     wrapText(String(value), 385, 2).forEach((line, index) => {
-      text(line, 135, top + 18 + index * 11, 10);
+      text(line, 135, top + 18 + index * 11, 10, "0.09 0.13 0.15");
     });
     top += 31;
   });
 
-  text("写真", 36, top + 18, 16);
+  text("写真", 36, top + 18, 16, "0.09 0.13 0.15");
   top += 30;
-  text("本人写真", 45, top + 18, 11);
-  text("アルコール検知器の写真", 314, top + 18, 11);
-  text("写真原本は添付していません。法定記録項目はこのPDFに集約されています。", 36, 806, 9);
+  text("本人写真", 45, top + 18, 11, "0.09 0.13 0.15");
+  text("アルコール検知器の写真", 314, top + 18, 11, "0.09 0.13 0.15");
+  text("写真原本は添付していません。法定記録項目はこのPDFに集約されています。", 36, 806, 9, "0.40 0.47 0.49");
 
   const content = commands.join("");
   const toUnicodeCMap = createToUnicodeCMap([
@@ -546,7 +501,7 @@ function createTextReportPdf({ rows, visualImage, pageWidth, pageHeight }) {
   const objects = [
     ascii("<< /Type /Catalog /Pages 2 0 R >>"),
     ascii("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
-    ascii(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 4 0 R >> /XObject << /Bg 5 0 R >> /ExtGState << /GS1 10 0 R >> >> /Contents 6 0 R >>`),
+    ascii(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 4 0 R >> /XObject << /Bg 5 0 R >> >> /Contents 6 0 R >>`),
     ascii("<< /Type /Font /Subtype /Type0 /BaseFont /HeiseiKakuGo-W5 /Encoding /UniJIS-UCS2-H /DescendantFonts [7 0 R] /ToUnicode 9 0 R >>"),
     concatBytes([
       ascii(`<< /Type /XObject /Subtype /Image /Width ${visualImage.width} /Height ${visualImage.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${visualImage.bytes.length} >>\nstream\n`),
@@ -556,8 +511,7 @@ function createTextReportPdf({ rows, visualImage, pageWidth, pageHeight }) {
     ascii(`<< /Length ${byteLength(content)} >>\nstream\n${content}endstream`),
     ascii("<< /Type /Font /Subtype /CIDFontType0 /BaseFont /HeiseiKakuGo-W5 /CIDSystemInfo << /Registry (Adobe) /Ordering (Japan1) /Supplement 2 >> /FontDescriptor 8 0 R >>"),
     ascii("<< /Type /FontDescriptor /FontName /HeiseiKakuGo-W5 /Flags 6 /FontBBox [0 -200 1000 900] /ItalicAngle 0 /Ascent 880 /Descent -120 /CapHeight 700 /StemV 80 >>"),
-    ascii(`<< /Length ${byteLength(toUnicodeCMap)} >>\nstream\n${toUnicodeCMap}endstream`),
-    ascii("<< /Type /ExtGState /ca 0.01 /CA 0.01 >>")
+    ascii(`<< /Length ${byteLength(toUnicodeCMap)} >>\nstream\n${toUnicodeCMap}endstream`)
   ];
 
   const chunks = [ascii("%PDF-1.4\n")];
