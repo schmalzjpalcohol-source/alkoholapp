@@ -1,9 +1,8 @@
-import { Camera, CheckCircle2, Copy, Gauge, Mail, RotateCcw, Send, ShieldCheck } from "lucide-react";
+import { Camera, CheckCircle2, Gauge, Mail, RotateCcw, Send, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 
-const RECIPIENT_EMAIL = "Naomi.Hattori@schmalz.co.jp";
 const TRIP_TYPES = [
   { value: "beforeWork", label: "業務前" },
   { value: "afterWork", label: "業務後" }
@@ -81,15 +80,13 @@ function App() {
     setReportFile({ files: packageData.files });
 
     try {
-      await copyRecipientToClipboard(false);
-
       if (navigator.canShare?.({ files: packageData.files }) && navigator.share) {
         await navigator.share({
           files: packageData.files,
           title: buildEmailSubject(packageData.data),
           text: buildEmailBody(packageData.data)
         });
-        setStatus(`宛先を確認してください: ${RECIPIENT_EMAIL} / 最後にメール画面で送信を押してください。`);
+        setStatus("メール画面で送信先、件名、添付ファイルを確認し、最後に送信を押してください。");
         return;
       }
 
@@ -98,19 +95,6 @@ function App() {
       setStatus("メール共有がキャンセルされました。もう一度「Outlookで送信」を押してください。");
     } finally {
       setBusy(false);
-    }
-  }
-
-  async function copyRecipientToClipboard(showStatus = true) {
-    try {
-      await navigator.clipboard?.writeText(RECIPIENT_EMAIL);
-      if (showStatus) {
-        setStatus(`宛先をコピーしました: ${RECIPIENT_EMAIL}`);
-      }
-    } catch {
-      if (showStatus) {
-        setStatus(`宛先: ${RECIPIENT_EMAIL}`);
-      }
     }
   }
 
@@ -243,7 +227,6 @@ function App() {
           {currentStep === "send" && (
             <section className="review-screen">
               <div className="summary-list">
-                <SummaryRow label="宛先" value={RECIPIENT_EMAIL} />
                 <SummaryRow label="件名" value={emailSubject} />
                 <SummaryRow label="種別" value={getTripTypeLabel(tripType)} />
                 <SummaryRow label="ショートネーム" value={name || "-"} />
@@ -264,12 +247,8 @@ function App() {
                   <Send size={20} />
                   {busy ? "準備中..." : "Outlookで送信"}
                 </button>
-                <button className="secondary-button" onClick={() => copyRecipientToClipboard()} type="button">
-                  <Copy size={18} />
-                  宛先をコピー
-                </button>
               </div>
-              <p className="attachment-note">メール画面で「宛先」に {RECIPIENT_EMAIL} が入っていることを確認してください。別添付: PDF報告書 + 本人写真 + 検知器写真</p>
+              <p className="attachment-note">メール画面で送信先を入力し、別添付のPDF報告書、本人写真、検知器写真を確認してください。</p>
             </section>
           )}
 
@@ -288,7 +267,7 @@ function App() {
 
         <section className="notice">
           <Mail size={20} />
-          <p>宛先は {RECIPIENT_EMAIL} です。送信時はPDF報告書、本人写真、検知器写真が添付されます。Outlookまたはメールで「宛先」と添付を確認し、最後に送信を押してください。</p>
+          <p>送信時はPDF報告書、本人写真、検知器写真が添付されます。Outlookまたはメールで送信先と添付を確認し、最後に送信を押してください。</p>
         </section>
       </section>
     </main>
@@ -368,7 +347,6 @@ function buildEmailBody(data) {
     "",
     "アルコールチェックの内容を送付します。",
     "",
-    `宛先: ${RECIPIENT_EMAIL}`,
     `件名: ${buildEmailSubject(data)}`,
     `種別: ${getTripTypeLabel(data.tripType)}`,
     `ショートネーム: ${data.name}`,
