@@ -442,10 +442,12 @@ async function jpegFromImage(image) {
 
 function createTextReportPdf({ rows, personImage, bacImage, fontBytes, pageWidth, pageHeight }) {
   const commands = [];
+  const fontCMap = readFontCMap(fontBytes);
+  const unicodeMappings = new Map();
   const y = (top) => pageHeight - top;
   const add = (value) => commands.push(value);
   const text = (value, x, top, size = 12, color = "0.09 0.13 0.15") => {
-    add(`BT /F1 ${size} Tf 0 Tr ${color} rg 1 0 0 1 ${x} ${y(top)} Tm ${pdfHexString(value)} Tj ET\n`);
+    add(`BT /F1 ${size} Tf 0 Tr ${color} rg 1 0 0 1 ${x} ${y(top)} Tm ${pdfHexString(value, fontCMap, unicodeMappings)} Tj ET\n`);
   };
   const rect = (x, top, width, height, color) => {
     add(`${color} rg\n${x} ${y(top + height)} ${width} ${height} re f\n`);
@@ -476,21 +478,12 @@ function createTextReportPdf({ rows, personImage, bacImage, fontBytes, pageWidth
   text("写真原本は添付していません。法定記録項目はこのPDFに集約されています。", 36, 806, 9, "0.40 0.47 0.49");
 
   const content = commands.join("");
-  const toUnicodeCMap = createToUnicodeCMap([
-    "アルコールチェック報告書",
-    "Alcohol Check Report",
-    "確認内容",
-    "写真",
-    "本人写真",
-    "アルコール検知器の写真",
-    "写真原本は添付していません。法定記録項目はこのPDFに集約されています。",
-    ...rows.flatMap(([label, value]) => [label, String(value)])
-  ]);
+  const toUnicodeCMap = createToUnicodeCMap(unicodeMappings);
   const objects = [
     ascii("<< /Type /Catalog /Pages 2 0 R >>"),
     ascii("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
     ascii(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 4 0 R >> /XObject << /Im1 5 0 R /Im2 6 0 R >> >> /Contents 7 0 R >>`),
-    ascii("<< /Type /Font /Subtype /Type0 /BaseFont /NotoSansJP-Regular /Encoding /UniJIS-UCS2-H /DescendantFonts [8 0 R] /ToUnicode 10 0 R >>"),
+    ascii("<< /Type /Font /Subtype /Type0 /BaseFont /NotoSansJP-Regular /Encoding /Identity-H /DescendantFonts [8 0 R] /ToUnicode 10 0 R >>"),
     concatBytes([
       ascii(`<< /Type /XObject /Subtype /Image /Width ${personImage.width} /Height ${personImage.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${personImage.bytes.length} >>\nstream\n`),
       personImage.bytes,
@@ -502,7 +495,7 @@ function createTextReportPdf({ rows, personImage, bacImage, fontBytes, pageWidth
       ascii("\nendstream")
     ]),
     ascii(`<< /Length ${byteLength(content)} >>\nstream\n${content}endstream`),
-    ascii("<< /Type /Font /Subtype /CIDFontType0 /BaseFont /NotoSansJP-Regular /CIDSystemInfo << /Registry (Adobe) /Ordering (Japan1) /Supplement 2 >> /FontDescriptor 9 0 R /DW 1000 >>"),
+    ascii("<< /Type /Font /Subtype /CIDFontType0 /BaseFont /NotoSansJP-Regular /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> /FontDescriptor 9 0 R /DW 1000 >>"),
     ascii("<< /Type /FontDescriptor /FontName /NotoSansJP-Regular /Flags 4 /FontBBox [-1000 -1048 2928 1808] /ItalicAngle 0 /Ascent 1160 /Descent -288 /CapHeight 733 /StemV 80 /FontFile3 11 0 R >>"),
     ascii(`<< /Length ${byteLength(toUnicodeCMap)} >>\nstream\n${toUnicodeCMap}endstream`),
     concatBytes([
@@ -559,19 +552,11 @@ function wrapText(value, maxWidth, maxLines) {
   return lines.slice(0, maxLines);
 }
 
-function createToUnicodeCMap(values) {
-  const codes = Array.from(
-    new Set(
-      values.flatMap((value) =>
-        Array.from(String(value))
-          .map((char) => char.codePointAt(0))
-          .filter((code) => code <= 0xffff)
-      )
-    )
-  ).sort((a, b) => a - b);
-  const mappings = codes.map((code) => {
-    const hex = code.toString(16).padStart(4, "0");
-    return `<${hex}> <${hex}>`;
+function createToUnicodeCMap(mapping) {
+  const mappings = Array.from(mapping.entries())
+    .sort(([sourceA], [sourceB]) => sourceA - sourceB)
+    .map(([source, codePoint]) => {
+      return `<${source.toString(16).padStart(4, "0")}> <${utf16Hex(codePoint)}>`;
   });
   const chunks = [];
   for (let index = 0; index < mappings.length; index += 100) {
@@ -598,22 +583,127 @@ function createToUnicodeCMap(values) {
   ].join("\n");
 }
 
-function pdfHexString(value) {
+function pdfHexString(value, fontCMap, unicodeMappings) {
   const bytes = [];
   for (const char of String(value)) {
     const code = char.codePointAt(0);
-    if (code > 0xffff) {
-      const normalized = Array.from(char.normalize("NFKC"));
-      normalized.forEach((part) => pushUtf16Be(bytes, part.charCodeAt(0)));
-    } else {
-      pushUtf16Be(bytes, code);
-    }
+    const glyphCode = fontCMap.get(code) || fontCMap.get(char.normalize("NFKC").codePointAt(0)) || code;
+    pushUtf16Be(bytes, glyphCode);
+    unicodeMappings.set(glyphCode, code);
   }
   return `<${bytes.map((byte) => byte.toString(16).padStart(2, "0")).join("")}>`;
 }
 
 function pushUtf16Be(bytes, code) {
   bytes.push((code >> 8) & 0xff, code & 0xff);
+}
+
+function utf16Hex(codePoint) {
+  const codes = [];
+  if (codePoint > 0xffff) {
+    const value = codePoint - 0x10000;
+    codes.push(0xd800 + (value >> 10), 0xdc00 + (value & 0x3ff));
+  } else {
+    codes.push(codePoint);
+  }
+  return codes.map((code) => code.toString(16).padStart(4, "0")).join("");
+}
+
+function readFontCMap(fontBytes) {
+  const view = new DataView(fontBytes.buffer, fontBytes.byteOffset, fontBytes.byteLength);
+  const numTables = view.getUint16(4);
+  let cmapOffset = 0;
+  for (let index = 0; index < numTables; index += 1) {
+    const offset = 12 + index * 16;
+    const tag = String.fromCharCode(
+      view.getUint8(offset),
+      view.getUint8(offset + 1),
+      view.getUint8(offset + 2),
+      view.getUint8(offset + 3)
+    );
+    if (tag === "cmap") {
+      cmapOffset = view.getUint32(offset + 8);
+      break;
+    }
+  }
+  if (!cmapOffset) return new Map();
+
+  const tableCount = view.getUint16(cmapOffset + 2);
+  let bestOffset = 0;
+  let bestScore = -1;
+  for (let index = 0; index < tableCount; index += 1) {
+    const record = cmapOffset + 4 + index * 8;
+    const platform = view.getUint16(record);
+    const encoding = view.getUint16(record + 2);
+    const subtableOffset = cmapOffset + view.getUint32(record + 4);
+    const format = view.getUint16(subtableOffset);
+    const score = getCMapScore(platform, encoding, format);
+    if (score > bestScore) {
+      bestScore = score;
+      bestOffset = subtableOffset;
+    }
+  }
+  if (!bestOffset) return new Map();
+
+  const format = view.getUint16(bestOffset);
+  if (format === 12) return readFormat12CMap(view, bestOffset);
+  if (format === 4) return readFormat4CMap(view, bestOffset);
+  return new Map();
+}
+
+function getCMapScore(platform, encoding, format) {
+  if (format === 12 && platform === 3 && encoding === 10) return 40;
+  if (format === 12 && platform === 0) return 35;
+  if (format === 4 && platform === 3 && encoding === 1) return 30;
+  if (format === 4 && platform === 0) return 25;
+  if (format === 12) return 20;
+  if (format === 4) return 10;
+  return 0;
+}
+
+function readFormat12CMap(view, offset) {
+  const map = new Map();
+  const groupCount = view.getUint32(offset + 12);
+  for (let index = 0; index < groupCount; index += 1) {
+    const group = offset + 16 + index * 12;
+    const startCode = view.getUint32(group);
+    const endCode = view.getUint32(group + 4);
+    const startGlyph = view.getUint32(group + 8);
+    for (let code = startCode; code <= endCode && code <= 0xffff; code += 1) {
+      map.set(code, startGlyph + code - startCode);
+    }
+  }
+  return map;
+}
+
+function readFormat4CMap(view, offset) {
+  const map = new Map();
+  const segCount = view.getUint16(offset + 6) / 2;
+  const endCodes = offset + 14;
+  const startCodes = endCodes + segCount * 2 + 2;
+  const idDeltas = startCodes + segCount * 2;
+  const idRangeOffsets = idDeltas + segCount * 2;
+
+  for (let segment = 0; segment < segCount; segment += 1) {
+    const endCode = view.getUint16(endCodes + segment * 2);
+    const startCode = view.getUint16(startCodes + segment * 2);
+    const idDelta = view.getInt16(idDeltas + segment * 2);
+    const idRangeOffset = view.getUint16(idRangeOffsets + segment * 2);
+    if (startCode === 0xffff && endCode === 0xffff) continue;
+
+    for (let code = startCode; code <= endCode; code += 1) {
+      let glyph = 0;
+      if (idRangeOffset === 0) {
+        glyph = (code + idDelta) & 0xffff;
+      } else {
+        const glyphIndexAddress = idRangeOffsets + segment * 2 + idRangeOffset + (code - startCode) * 2;
+        glyph = view.getUint16(glyphIndexAddress);
+        if (glyph !== 0) glyph = (glyph + idDelta) & 0xffff;
+      }
+      if (glyph !== 0) map.set(code, glyph);
+    }
+  }
+  return map;
 }
 
 function byteLength(value) {
