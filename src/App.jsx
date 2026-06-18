@@ -1,4 +1,4 @@
-import { Camera, CheckCircle2, Gauge, Mail, RotateCcw, Send, ShieldCheck } from "lucide-react";
+import { Camera, CheckCircle2, Copy, Gauge, Mail, RotateCcw, Send, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
@@ -81,13 +81,15 @@ function App() {
     setReportFile({ files: packageData.files });
 
     try {
+      await copyRecipientToClipboard(false);
+
       if (navigator.canShare?.({ files: packageData.files }) && navigator.share) {
         await navigator.share({
           files: packageData.files,
           title: buildEmailSubject(packageData.data),
           text: buildEmailBody(packageData.data)
         });
-        setStatus(`宛先: ${RECIPIENT_EMAIL} / Outlook件名: ${buildEmailSubject(packageData.data)}`);
+        setStatus(`宛先を確認してください: ${RECIPIENT_EMAIL} / 最後にメール画面で送信を押してください。`);
         return;
       }
 
@@ -96,6 +98,19 @@ function App() {
       setStatus("メール共有がキャンセルされました。もう一度「Outlookで送信」を押してください。");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function copyRecipientToClipboard(showStatus = true) {
+    try {
+      await navigator.clipboard?.writeText(RECIPIENT_EMAIL);
+      if (showStatus) {
+        setStatus(`宛先をコピーしました: ${RECIPIENT_EMAIL}`);
+      }
+    } catch {
+      if (showStatus) {
+        setStatus(`宛先: ${RECIPIENT_EMAIL}`);
+      }
     }
   }
 
@@ -249,8 +264,12 @@ function App() {
                   <Send size={20} />
                   {busy ? "準備中..." : "Outlookで送信"}
                 </button>
+                <button className="secondary-button" onClick={() => copyRecipientToClipboard()} type="button">
+                  <Copy size={18} />
+                  宛先をコピー
+                </button>
               </div>
-              <p className="attachment-note">宛先: {RECIPIENT_EMAIL} / 別添付: PDF報告書 + 本人写真 + 検知器写真</p>
+              <p className="attachment-note">メール画面で「宛先」に {RECIPIENT_EMAIL} が入っていることを確認してください。別添付: PDF報告書 + 本人写真 + 検知器写真</p>
             </section>
           )}
 
@@ -269,7 +288,7 @@ function App() {
 
         <section className="notice">
           <Mail size={20} />
-          <p>宛先は {RECIPIENT_EMAIL} です。送信時はPDF報告書、本人写真、検知器写真が添付されます。Outlookまたはメールで宛先を確認してから送信してください。</p>
+          <p>宛先は {RECIPIENT_EMAIL} です。送信時はPDF報告書、本人写真、検知器写真が添付されます。Outlookまたはメールで「宛先」と添付を確認し、最後に送信を押してください。</p>
         </section>
       </section>
     </main>
