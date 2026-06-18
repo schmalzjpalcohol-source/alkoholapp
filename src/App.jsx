@@ -412,11 +412,11 @@ async function buildReportPdf(data, personPhoto, bacPhoto, fileName) {
     y += 54;
   });
 
-  y += 10;
+  y += 24;
   context.fillStyle = "#172026";
-  context.font = "700 34px -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif";
+  context.font = "700 30px -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif";
   context.fillText("写真", 72, y);
-  y += 26;
+  y += 52;
 
   const [personImage, bacImage] = await Promise.all([loadImageFromFile(personPhoto), loadImageFromFile(bacPhoto)]);
   drawPhotoBlock(context, personImage, "本人写真", 72, y, 536, 840);
