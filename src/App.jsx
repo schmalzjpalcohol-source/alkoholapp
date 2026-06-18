@@ -510,7 +510,7 @@ function createTextReportPdf({ rows, visualImage, pageWidth, pageHeight }) {
   const y = (top) => pageHeight - top;
   const add = (value) => commands.push(value);
   const text = (value, x, top, size = 12) => {
-    add(`BT /F1 ${size} Tf 3 Tr 1 0 0 1 ${x} ${y(top)} Tm ${pdfHexString(value)} Tj ET\n`);
+    add(`BT /F1 ${size} Tf 0 Tr 1 1 1 rg /GS1 gs 1 0 0 1 ${x} ${y(top)} Tm ${pdfHexString(value)} Tj ET\n`);
   };
   add(`q\n${pageWidth} 0 0 ${pageHeight} 0 0 cm\n/Bg Do\nQ\n`);
   text("アルコールチェック報告書", 36, 50, 24);
@@ -546,7 +546,7 @@ function createTextReportPdf({ rows, visualImage, pageWidth, pageHeight }) {
   const objects = [
     ascii("<< /Type /Catalog /Pages 2 0 R >>"),
     ascii("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
-    ascii(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 4 0 R >> /XObject << /Bg 5 0 R >> >> /Contents 6 0 R >>`),
+    ascii(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 4 0 R >> /XObject << /Bg 5 0 R >> /ExtGState << /GS1 10 0 R >> >> /Contents 6 0 R >>`),
     ascii("<< /Type /Font /Subtype /Type0 /BaseFont /HeiseiKakuGo-W5 /Encoding /UniJIS-UCS2-H /DescendantFonts [7 0 R] /ToUnicode 9 0 R >>"),
     concatBytes([
       ascii(`<< /Type /XObject /Subtype /Image /Width ${visualImage.width} /Height ${visualImage.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${visualImage.bytes.length} >>\nstream\n`),
@@ -556,7 +556,8 @@ function createTextReportPdf({ rows, visualImage, pageWidth, pageHeight }) {
     ascii(`<< /Length ${byteLength(content)} >>\nstream\n${content}endstream`),
     ascii("<< /Type /Font /Subtype /CIDFontType0 /BaseFont /HeiseiKakuGo-W5 /CIDSystemInfo << /Registry (Adobe) /Ordering (Japan1) /Supplement 2 >> /FontDescriptor 8 0 R >>"),
     ascii("<< /Type /FontDescriptor /FontName /HeiseiKakuGo-W5 /Flags 6 /FontBBox [0 -200 1000 900] /ItalicAngle 0 /Ascent 880 /Descent -120 /CapHeight 700 /StemV 80 >>"),
-    ascii(`<< /Length ${byteLength(toUnicodeCMap)} >>\nstream\n${toUnicodeCMap}endstream`)
+    ascii(`<< /Length ${byteLength(toUnicodeCMap)} >>\nstream\n${toUnicodeCMap}endstream`),
+    ascii("<< /Type /ExtGState /ca 0.01 /CA 0.01 >>")
   ];
 
   const chunks = [ascii("%PDF-1.4\n")];
