@@ -8,6 +8,7 @@ const TRIP_TYPES = [
   { value: "afterWork", label: "業務後" }
 ];
 const EMAIL_TITLE = "アルコールチェック報告";
+let pdfFontBytesPromise = null;
 
 function App() {
   const pageRef = useRef(null);
@@ -378,9 +379,23 @@ async function buildReportPdf(data, personPhoto, bacPhoto, fileName) {
     ["備考", data.note || "-"]
   ];
   const [personImage, bacImage] = await Promise.all([loadImageFromFile(personPhoto), loadImageFromFile(bacPhoto)]);
-  const visualImage = await renderReportVisualImage(data, rows, personImage, bacImage);
-  const pdfBytes = createTextReportPdf({ rows, visualImage, pageWidth, pageHeight });
+  const [personJpeg, bacJpeg, fontBytes] = await Promise.all([
+    jpegFromImage(personImage),
+    jpegFromImage(bacImage),
+    loadPdfFontBytes()
+  ]);
+  const pdfBytes = createTextReportPdf({ rows, personImage: personJpeg, bacImage: bacJpeg, fontBytes, pageWidth, pageHeight });
   return new File([pdfBytes], fileName, { type: "application/pdf" });
+}
+
+async function loadPdfFontBytes() {
+  if (!pdfFontBytesPromise) {
+    pdfFontBytesPromise = fetch("https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@main/Sans/OTF/Japanese/NotoSansCJKjp-Regular.otf").then(async (response) => {
+      if (!response.ok) throw new Error("PDF font could not be loaded");
+      return new Uint8Array(await response.arrayBuffer());
+    });
+  }
+  return pdfFontBytesPromise;
 }
 
 function loadImageFromFile(file) {
@@ -411,69 +426,40 @@ function canvasToJpegBytes(canvas, quality) {
   });
 }
 
-async function renderReportVisualImage(data, rows, personImage, bacImage) {
-  const width = 1240;
-  const height = 1754;
+async function jpegFromImage(image) {
+  const maxSide = 1400;
+  const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
   const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-
+  canvas.width = Math.max(1, Math.round(image.width * scale));
+  canvas.height = Math.max(1, Math.round(image.height * scale));
   const context = canvas.getContext("2d");
   context.fillStyle = "#ffffff";
-  context.fillRect(0, 0, width, height);
-
-  context.fillStyle = "#0f766e";
-  context.fillRect(0, 0, width, 180);
-
-  let y = 250;
-  y += 38;
-
-  rows.forEach(([label, value]) => {
-    context.fillStyle = "#eef3f2";
-    context.fillRect(72, y, 1096, 48);
-    y += 54;
-  });
-
-  y += 10;
-  y += 26;
-
-  drawCanvasPhotoBlock(context, personImage, 72, y, 536, 840);
-  drawCanvasPhotoBlock(context, bacImage, 632, y, 536, 840);
-
-  const bytes = await canvasToJpegBytes(canvas, 0.72);
-  return { bytes, width, height };
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  const bytes = await canvasToJpegBytes(canvas, 0.78);
+  return { bytes, width: canvas.width, height: canvas.height };
 }
 
-function drawCanvasPhotoBlock(context, image, x, y, width, height) {
-  context.fillStyle = "#f7faf9";
-  context.fillRect(x, y, width, height);
-  context.strokeStyle = "#d6e0de";
-  context.lineWidth = 2;
-  context.strokeRect(x, y, width, height);
-
-  const imageBox = { x: x + 18, y: y + 58, width: width - 36, height: height - 78 };
-  const scale = Math.min(imageBox.width / image.width, imageBox.height / image.height);
-  const drawWidth = image.width * scale;
-  const drawHeight = image.height * scale;
-  const drawX = imageBox.x + (imageBox.width - drawWidth) / 2;
-  const drawY = imageBox.y + (imageBox.height - drawHeight) / 2;
-  context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
-}
-
-function createTextReportPdf({ rows, visualImage, pageWidth, pageHeight }) {
+function createTextReportPdf({ rows, personImage, bacImage, fontBytes, pageWidth, pageHeight }) {
   const commands = [];
   const y = (top) => pageHeight - top;
   const add = (value) => commands.push(value);
   const text = (value, x, top, size = 12, color = "0.09 0.13 0.15") => {
     add(`BT /F1 ${size} Tf 0 Tr ${color} rg 1 0 0 1 ${x} ${y(top)} Tm ${pdfHexString(value)} Tj ET\n`);
   };
-  add(`q\n${pageWidth} 0 0 ${pageHeight} 0 0 cm\n/Bg Do\nQ\n`);
+  const rect = (x, top, width, height, color) => {
+    add(`${color} rg\n${x} ${y(top + height)} ${width} ${height} re f\n`);
+  };
+
+  rect(0, 0, pageWidth, pageHeight, "1 1 1");
+  rect(0, 0, pageWidth, 86, "0.06 0.46 0.43");
   text("アルコールチェック報告書", 36, 50, 24, "1 1 1");
   text("Alcohol Check Report", 38, 73, 11, "1 1 1");
   text("確認内容", 36, 121, 16, "0.09 0.13 0.15");
 
   let top = 138;
   rows.forEach(([label, value]) => {
+    rect(36, top, 523, 28, "0.93 0.95 0.95");
     text(label, 48, top + 18, 9, "0.32 0.40 0.42");
     wrapText(String(value), 385, 2).forEach((line, index) => {
       text(line, 135, top + 18 + index * 11, 10, "0.09 0.13 0.15");
@@ -483,6 +469,8 @@ function createTextReportPdf({ rows, visualImage, pageWidth, pageHeight }) {
 
   text("写真", 36, top + 18, 16, "0.09 0.13 0.15");
   top += 30;
+  drawPdfPhotoBlock(add, personImage, "Im1", 36, top, 253, 390, pageHeight);
+  drawPdfPhotoBlock(add, bacImage, "Im2", 306, top, 253, 390, pageHeight);
   text("本人写真", 45, top + 18, 11, "0.09 0.13 0.15");
   text("アルコール検知器の写真", 314, top + 18, 11, "0.09 0.13 0.15");
   text("写真原本は添付していません。法定記録項目はこのPDFに集約されています。", 36, 806, 9, "0.40 0.47 0.49");
@@ -501,20 +489,30 @@ function createTextReportPdf({ rows, visualImage, pageWidth, pageHeight }) {
   const objects = [
     ascii("<< /Type /Catalog /Pages 2 0 R >>"),
     ascii("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
-    ascii(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 4 0 R >> /XObject << /Bg 5 0 R >> >> /Contents 6 0 R >>`),
-    ascii("<< /Type /Font /Subtype /Type0 /BaseFont /HeiseiKakuGo-W5 /Encoding /UniJIS-UCS2-H /DescendantFonts [7 0 R] /ToUnicode 9 0 R >>"),
+    ascii(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 4 0 R >> /XObject << /Im1 5 0 R /Im2 6 0 R >> >> /Contents 7 0 R >>`),
+    ascii("<< /Type /Font /Subtype /Type0 /BaseFont /NotoSansJP-Regular /Encoding /UniJIS-UCS2-H /DescendantFonts [8 0 R] /ToUnicode 10 0 R >>"),
     concatBytes([
-      ascii(`<< /Type /XObject /Subtype /Image /Width ${visualImage.width} /Height ${visualImage.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${visualImage.bytes.length} >>\nstream\n`),
-      visualImage.bytes,
+      ascii(`<< /Type /XObject /Subtype /Image /Width ${personImage.width} /Height ${personImage.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${personImage.bytes.length} >>\nstream\n`),
+      personImage.bytes,
+      ascii("\nendstream")
+    ]),
+    concatBytes([
+      ascii(`<< /Type /XObject /Subtype /Image /Width ${bacImage.width} /Height ${bacImage.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${bacImage.bytes.length} >>\nstream\n`),
+      bacImage.bytes,
       ascii("\nendstream")
     ]),
     ascii(`<< /Length ${byteLength(content)} >>\nstream\n${content}endstream`),
-    ascii("<< /Type /Font /Subtype /CIDFontType0 /BaseFont /HeiseiKakuGo-W5 /CIDSystemInfo << /Registry (Adobe) /Ordering (Japan1) /Supplement 2 >> /FontDescriptor 8 0 R >>"),
-    ascii("<< /Type /FontDescriptor /FontName /HeiseiKakuGo-W5 /Flags 6 /FontBBox [0 -200 1000 900] /ItalicAngle 0 /Ascent 880 /Descent -120 /CapHeight 700 /StemV 80 >>"),
-    ascii(`<< /Length ${byteLength(toUnicodeCMap)} >>\nstream\n${toUnicodeCMap}endstream`)
+    ascii("<< /Type /Font /Subtype /CIDFontType0 /BaseFont /NotoSansJP-Regular /CIDSystemInfo << /Registry (Adobe) /Ordering (Japan1) /Supplement 2 >> /FontDescriptor 9 0 R /DW 1000 >>"),
+    ascii("<< /Type /FontDescriptor /FontName /NotoSansJP-Regular /Flags 4 /FontBBox [-1000 -1048 2928 1808] /ItalicAngle 0 /Ascent 1160 /Descent -288 /CapHeight 733 /StemV 80 /FontFile3 11 0 R >>"),
+    ascii(`<< /Length ${byteLength(toUnicodeCMap)} >>\nstream\n${toUnicodeCMap}endstream`),
+    concatBytes([
+      ascii(`<< /Length ${fontBytes.length} /Subtype /OpenType >>\nstream\n`),
+      fontBytes,
+      ascii("\nendstream")
+    ])
   ];
 
-  const chunks = [ascii("%PDF-1.4\n")];
+  const chunks = [ascii("%PDF-1.6\n")];
   const offsets = [0];
   objects.forEach((object, index) => {
     offsets.push(totalLength(chunks));
@@ -529,6 +527,19 @@ function createTextReportPdf({ rows, visualImage, pageWidth, pageHeight }) {
   chunks.push(ascii(`trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`));
 
   return concatBytes(chunks);
+}
+
+function drawPdfPhotoBlock(add, image, imageName, x, top, width, height, pageHeight) {
+  add(`0.97 0.98 0.98 rg\n${x} ${pageHeight - top - height} ${width} ${height} re f\n`);
+  add(`0.84 0.88 0.87 RG\n${x} ${pageHeight - top - height} ${width} ${height} re S\n`);
+
+  const box = { x: x + 10, top: top + 34, width: width - 20, height: height - 44 };
+  const scale = Math.min(box.width / image.width, box.height / image.height);
+  const drawWidth = image.width * scale;
+  const drawHeight = image.height * scale;
+  const drawX = box.x + (box.width - drawWidth) / 2;
+  const drawY = pageHeight - (box.top + (box.height - drawHeight) / 2) - drawHeight;
+  add(`q ${drawWidth.toFixed(2)} 0 0 ${drawHeight.toFixed(2)} ${drawX.toFixed(2)} ${drawY.toFixed(2)} cm /${imageName} Do Q\n`);
 }
 
 function wrapText(value, maxWidth, maxLines) {
