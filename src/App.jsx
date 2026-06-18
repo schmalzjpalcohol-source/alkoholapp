@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 
+const RECIPIENT_EMAIL = "Naomi.Hattori@schmalz.co.jp";
 const TRIP_TYPES = [
   { value: "beforeWork", label: "業務前" },
   { value: "afterWork", label: "業務後" }
@@ -54,10 +55,11 @@ function App() {
     const typeLabel = getTripTypeLabel(tripType);
     const baseName = `alcohol-check-${safeFilePart(name)}-${typeLabel}-${fileStamp}`;
     const reportPdf = await buildReportPdf(currentReportData, personPhoto, bacPhoto, `${baseName}.pdf`);
-    const photoZip = await buildPhotoZip(personPhoto, bacPhoto, `${baseName}-photos.zip`, fileStamp);
+    const personImage = renamePhotoFile(personPhoto, `${baseName}-person-photo`);
+    const bacImage = renamePhotoFile(bacPhoto, `${baseName}-bac-meter-photo`);
     return {
       data: currentReportData,
-      files: [reportPdf, photoZip]
+      files: [reportPdf, personImage, bacImage]
     };
   }
 
@@ -85,7 +87,7 @@ function App() {
           title: buildEmailSubject(packageData.data),
           text: buildEmailBody(packageData.data)
         });
-        setStatus(`Outlook件名: ${buildEmailSubject(packageData.data)}`);
+        setStatus(`宛先: ${RECIPIENT_EMAIL} / Outlook件名: ${buildEmailSubject(packageData.data)}`);
         return;
       }
 
@@ -226,6 +228,7 @@ function App() {
           {currentStep === "send" && (
             <section className="review-screen">
               <div className="summary-list">
+                <SummaryRow label="宛先" value={RECIPIENT_EMAIL} />
                 <SummaryRow label="件名" value={emailSubject} />
                 <SummaryRow label="種別" value={getTripTypeLabel(tripType)} />
                 <SummaryRow label="ショートネーム" value={name || "-"} />
@@ -247,7 +250,7 @@ function App() {
                   {busy ? "準備中..." : "Outlookで送信"}
                 </button>
               </div>
-              <p className="attachment-note">別添付: PDF報告書 + 写真ZIP</p>
+              <p className="attachment-note">宛先: {RECIPIENT_EMAIL} / 別添付: PDF報告書 + 本人写真 + 検知器写真</p>
             </section>
           )}
 
@@ -266,7 +269,7 @@ function App() {
 
         <section className="notice">
           <Mail size={20} />
-          <p>Outlookの自動仕分け用に件名は固定形式です。送信時はPDF報告書と写真ZIPが添付されます。写真はZIP内の個別ファイルとして保存できます。</p>
+          <p>宛先は {RECIPIENT_EMAIL} です。送信時はPDF報告書、本人写真、検知器写真が添付されます。Outlookまたはメールで宛先を確認してから送信してください。</p>
         </section>
       </section>
     </main>
@@ -346,6 +349,7 @@ function buildEmailBody(data) {
     "",
     "アルコールチェックの内容を送付します。",
     "",
+    `宛先: ${RECIPIENT_EMAIL}`,
     `件名: ${buildEmailSubject(data)}`,
     `種別: ${getTripTypeLabel(data.tripType)}`,
     `ショートネーム: ${data.name}`,
@@ -355,26 +359,13 @@ function buildEmailBody(data) {
     "",
     "添付ファイル:",
     "1. PDF報告書（入力内容と2枚の写真を含む）",
-    "2. 写真ZIP（本人写真とアルコール検知器の写真を個別ファイルとして含む）",
+    "2. 本人写真",
+    "3. アルコール検知器の写真",
     "",
     data.note ? `備考: ${data.note}` : "備考: -",
     "",
-    "PDFで内容を確認できます。元の写真ファイルはZIPからダウンロードできます。"
+    "PDFで内容を確認できます。写真ファイルも別添付されています。"
   ].join("\n");
-}
-
-async function buildPhotoZip(personPhoto, bacPhoto, fileName, fileStamp) {
-  const files = [
-    {
-      name: `person-photo-${fileStamp}${getFileExtension(personPhoto.name) || imageExtensionFromType(personPhoto.type)}`,
-      bytes: await fileToBytes(personPhoto)
-    },
-    {
-      name: `bac-meter-photo-${fileStamp}${getFileExtension(bacPhoto.name) || imageExtensionFromType(bacPhoto.type)}`,
-      bytes: await fileToBytes(bacPhoto)
-    }
-  ];
-  return new File([createZip(files)], fileName, { type: "application/zip" });
 }
 
 async function buildReportPdf(data, personPhoto, bacPhoto, fileName) {
@@ -436,7 +427,7 @@ async function buildReportPdf(data, personPhoto, bacPhoto, fileName) {
 
   context.fillStyle = "#66777d";
   context.font = "400 20px -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif";
-  context.fillText("PDFに加えて、メールには写真ZIPも添付されています。", 72, 1648);
+  context.fillText("PDFに加えて、メールには2枚の写真ファイルも添付されています。", 72, 1648);
 
   const jpegBytes = await canvasToJpegBytes(canvas, 0.72);
   const pdfBytes = createSingleImagePdf(jpegBytes, pageWidth, pageHeight);
@@ -567,94 +558,6 @@ function renamePhotoFile(file, baseName) {
   return new File([file], `${baseName}${extension}`, { type: file.type || "image/jpeg" });
 }
 
-function fileToBytes(file) {
-  return file.arrayBuffer().then((buffer) => new Uint8Array(buffer));
-}
-
-function createZip(files) {
-  const localParts = [];
-  const centralParts = [];
-  let offset = 0;
-
-  files.forEach((file) => {
-    const nameBytes = ascii(file.name);
-    const checksum = crc32(file.bytes);
-    const localHeader = concatBytes([
-      uint32(0x04034b50),
-      uint16(20),
-      uint16(0),
-      uint16(0),
-      uint16(0),
-      uint16(0),
-      uint32(checksum),
-      uint32(file.bytes.length),
-      uint32(file.bytes.length),
-      uint16(nameBytes.length),
-      uint16(0),
-      nameBytes
-    ]);
-
-    localParts.push(localHeader, file.bytes);
-
-    centralParts.push(
-      concatBytes([
-        uint32(0x02014b50),
-        uint16(20),
-        uint16(20),
-        uint16(0),
-        uint16(0),
-        uint16(0),
-        uint16(0),
-        uint32(checksum),
-        uint32(file.bytes.length),
-        uint32(file.bytes.length),
-        uint16(nameBytes.length),
-        uint16(0),
-        uint16(0),
-        uint16(0),
-        uint16(0),
-        uint32(0),
-        uint32(offset),
-        nameBytes
-      ])
-    );
-
-    offset += localHeader.length + file.bytes.length;
-  });
-
-  const centralDirectory = concatBytes(centralParts);
-  const endRecord = concatBytes([
-    uint32(0x06054b50),
-    uint16(0),
-    uint16(0),
-    uint16(files.length),
-    uint16(files.length),
-    uint32(centralDirectory.length),
-    uint32(offset),
-    uint16(0)
-  ]);
-
-  return concatBytes([...localParts, centralDirectory, endRecord]);
-}
-
-function uint16(value) {
-  return new Uint8Array([value & 0xff, (value >>> 8) & 0xff]);
-}
-
-function uint32(value) {
-  return new Uint8Array([value & 0xff, (value >>> 8) & 0xff, (value >>> 16) & 0xff, (value >>> 24) & 0xff]);
-}
-
-function crc32(bytes) {
-  let crc = 0xffffffff;
-  bytes.forEach((byte) => {
-    crc ^= byte;
-    for (let bit = 0; bit < 8; bit += 1) {
-      crc = crc & 1 ? (crc >>> 1) ^ 0xedb88320 : crc >>> 1;
-    }
-  });
-  return (crc ^ 0xffffffff) >>> 0;
-}
 function getFileExtension(fileName) {
   const match = String(fileName).match(/\.[a-z0-9]+$/i);
   return match ? match[0].toLowerCase() : "";
