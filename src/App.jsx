@@ -54,11 +54,10 @@ function App() {
     const typeLabel = getTripTypeLabel(tripType);
     const baseName = `alcohol-check-${safeFilePart(name)}-${typeLabel}-${fileStamp}`;
     const reportPdf = await buildReportPdf(currentReportData, personPhoto, bacPhoto, `${baseName}.pdf`);
-    const personImage = renamePhotoFile(personPhoto, `${baseName}-separate-本人写真`);
-    const bacImage = renamePhotoFile(bacPhoto, `${baseName}-separate-検知器写真`);
+    const photoZip = await buildPhotoZip(personPhoto, bacPhoto, `${baseName}-photos.zip`, fileStamp);
     return {
       data: currentReportData,
-      files: [reportPdf, personImage, bacImage]
+      files: [reportPdf, photoZip]
     };
   }
 
@@ -248,7 +247,7 @@ function App() {
                   {busy ? "準備中..." : "Outlookで送信"}
                 </button>
               </div>
-              <p className="attachment-note">別添付: PDF報告書 + separate本人写真 + separate検知器写真</p>
+              <p className="attachment-note">別添付: PDF報告書 + 写真ZIP</p>
             </section>
           )}
 
@@ -267,7 +266,7 @@ function App() {
 
         <section className="notice">
           <Mail size={20} />
-          <p>Outlookの自動仕分け用に件名は固定形式です。送信時はPDF報告書に加えて、本人写真と検知器写真も本文ではなく別ファイルとして添付されます。</p>
+          <p>Outlookの自動仕分け用に件名は固定形式です。送信時はPDF報告書と写真ZIPが添付されます。写真はZIP内の個別ファイルとして保存できます。</p>
         </section>
       </section>
     </main>
@@ -356,11 +355,26 @@ function buildEmailBody(data) {
     "",
     "添付ファイル:",
     "1. PDF報告書（入力内容と2枚の写真を含む）",
-    "2. 本人写真（本文ではなく別添付）",
-    "3. アルコール検知器の写真（本文ではなく別添付）",
+    "2. 写真ZIP（本人写真とアルコール検知器の写真を個別ファイルとして含む）",
     "",
-    data.note ? `備考: ${data.note}` : "備考: -"
+    data.note ? `備考: ${data.note}` : "備考: -",
+    "",
+    "PDFで内容を確認できます。元の写真ファイルはZIPからダウンロードできます。"
   ].join("\n");
+}
+
+async function buildPhotoZip(personPhoto, bacPhoto, fileName, fileStamp) {
+  const files = [
+    {
+      name: `person-photo-${fileStamp}${getFileExtension(personPhoto.name) || imageExtensionFromType(personPhoto.type)}`,
+      bytes: await fileToBytes(personPhoto)
+    },
+    {
+      name: `bac-meter-photo-${fileStamp}${getFileExtension(bacPhoto.name) || imageExtensionFromType(bacPhoto.type)}`,
+      bytes: await fileToBytes(bacPhoto)
+    }
+  ];
+  return new File([createZip(files)], fileName, { type: "application/zip" });
 }
 
 async function buildReportPdf(data, personPhoto, bacPhoto, fileName) {
@@ -422,7 +436,7 @@ async function buildReportPdf(data, personPhoto, bacPhoto, fileName) {
 
   context.fillStyle = "#66777d";
   context.font = "400 20px -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif";
-  context.fillText("PDFに加えて、メールには2枚の写真ファイルも別添付されています。", 72, 1648);
+  context.fillText("PDFに加えて、メールには写真ZIPも添付されています。", 72, 1648);
 
   const jpegBytes = await canvasToJpegBytes(canvas, 0.72);
   const pdfBytes = createSingleImagePdf(jpegBytes, pageWidth, pageHeight);
@@ -553,6 +567,94 @@ function renamePhotoFile(file, baseName) {
   return new File([file], `${baseName}${extension}`, { type: file.type || "image/jpeg" });
 }
 
+function fileToBytes(file) {
+  return file.arrayBuffer().then((buffer) => new Uint8Array(buffer));
+}
+
+function createZip(files) {
+  const localParts = [];
+  const centralParts = [];
+  let offset = 0;
+
+  files.forEach((file) => {
+    const nameBytes = ascii(file.name);
+    const checksum = crc32(file.bytes);
+    const localHeader = concatBytes([
+      uint32(0x04034b50),
+      uint16(20),
+      uint16(0),
+      uint16(0),
+      uint16(0),
+      uint16(0),
+      uint32(checksum),
+      uint32(file.bytes.length),
+      uint32(file.bytes.length),
+      uint16(nameBytes.length),
+      uint16(0),
+      nameBytes
+    ]);
+
+    localParts.push(localHeader, file.bytes);
+
+    centralParts.push(
+      concatBytes([
+        uint32(0x02014b50),
+        uint16(20),
+        uint16(20),
+        uint16(0),
+        uint16(0),
+        uint16(0),
+        uint16(0),
+        uint32(checksum),
+        uint32(file.bytes.length),
+        uint32(file.bytes.length),
+        uint16(nameBytes.length),
+        uint16(0),
+        uint16(0),
+        uint16(0),
+        uint16(0),
+        uint32(0),
+        uint32(offset),
+        nameBytes
+      ])
+    );
+
+    offset += localHeader.length + file.bytes.length;
+  });
+
+  const centralDirectory = concatBytes(centralParts);
+  const endRecord = concatBytes([
+    uint32(0x06054b50),
+    uint16(0),
+    uint16(0),
+    uint16(files.length),
+    uint16(files.length),
+    uint32(centralDirectory.length),
+    uint32(offset),
+    uint16(0)
+  ]);
+
+  return concatBytes([...localParts, centralDirectory, endRecord]);
+}
+
+function uint16(value) {
+  return new Uint8Array([value & 0xff, (value >>> 8) & 0xff]);
+}
+
+function uint32(value) {
+  return new Uint8Array([value & 0xff, (value >>> 8) & 0xff, (value >>> 16) & 0xff, (value >>> 24) & 0xff]);
+}
+
+function crc32(bytes) {
+  let crc = 0xffffffff;
+  bytes.forEach((byte) => {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = crc & 1 ? (crc >>> 1) ^ 0xedb88320 : crc >>> 1;
+    }
+  });
+  return (crc ^ 0xffffffff) >>> 0;
+}
 function getFileExtension(fileName) {
   const match = String(fileName).match(/\.[a-z0-9]+$/i);
   return match ? match[0].toLowerCase() : "";
