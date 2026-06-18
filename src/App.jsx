@@ -470,11 +470,21 @@ function createTextReportPdf({ data, rows, personImage, bacImage, pageWidth, pag
   text("写真原本は添付していません。法定記録項目はこのPDFに集約されています。", 36, 806, 9);
 
   const content = commands.join("");
+  const toUnicodeCMap = createToUnicodeCMap([
+    "アルコールチェック報告書",
+    "Alcohol Check Report",
+    "確認内容",
+    "写真",
+    "本人写真",
+    "アルコール検知器の写真",
+    "写真原本は添付していません。法定記録項目はこのPDFに集約されています。",
+    ...rows.flatMap(([label, value]) => [label, String(value)])
+  ]);
   const objects = [
     ascii("<< /Type /Catalog /Pages 2 0 R >>"),
     ascii("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
     ascii(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 4 0 R >> /XObject << /Im1 5 0 R /Im2 6 0 R >> >> /Contents 7 0 R >>`),
-    ascii("<< /Type /Font /Subtype /Type0 /BaseFont /HeiseiKakuGo-W5 /Encoding /UniJIS-UCS2-H /DescendantFonts [8 0 R] >>"),
+    ascii("<< /Type /Font /Subtype /Type0 /BaseFont /HeiseiKakuGo-W5 /Encoding /UniJIS-UCS2-H /DescendantFonts [8 0 R] /ToUnicode 10 0 R >>"),
     concatBytes([
       ascii(`<< /Type /XObject /Subtype /Image /Width ${personImage.width} /Height ${personImage.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${personImage.bytes.length} >>\nstream\n`),
       personImage.bytes,
@@ -487,7 +497,8 @@ function createTextReportPdf({ data, rows, personImage, bacImage, pageWidth, pag
     ]),
     ascii(`<< /Length ${byteLength(content)} >>\nstream\n${content}endstream`),
     ascii("<< /Type /Font /Subtype /CIDFontType0 /BaseFont /HeiseiKakuGo-W5 /CIDSystemInfo << /Registry (Adobe) /Ordering (Japan1) /Supplement 2 >> /FontDescriptor 9 0 R >>"),
-    ascii("<< /Type /FontDescriptor /FontName /HeiseiKakuGo-W5 /Flags 6 /FontBBox [0 -200 1000 900] /ItalicAngle 0 /Ascent 880 /Descent -120 /CapHeight 700 /StemV 80 >>")
+    ascii("<< /Type /FontDescriptor /FontName /HeiseiKakuGo-W5 /Flags 6 /FontBBox [0 -200 1000 900] /ItalicAngle 0 /Ascent 880 /Descent -120 /CapHeight 700 /StemV 80 >>"),
+    ascii(`<< /Length ${byteLength(toUnicodeCMap)} >>\nstream\n${toUnicodeCMap}endstream`)
   ];
 
   const chunks = [ascii("%PDF-1.4\n")];
@@ -538,6 +549,45 @@ function wrapText(value, maxWidth, maxLines) {
   });
   if (line) lines.push(line);
   return lines.slice(0, maxLines);
+}
+
+function createToUnicodeCMap(values) {
+  const codes = Array.from(
+    new Set(
+      values.flatMap((value) =>
+        Array.from(String(value))
+          .map((char) => char.codePointAt(0))
+          .filter((code) => code <= 0xffff)
+      )
+    )
+  ).sort((a, b) => a - b);
+  const mappings = codes.map((code) => {
+    const hex = code.toString(16).padStart(4, "0");
+    return `<${hex}> <${hex}>`;
+  });
+  const chunks = [];
+  for (let index = 0; index < mappings.length; index += 100) {
+    const group = mappings.slice(index, index + 100);
+    chunks.push(`${group.length} beginbfchar\n${group.join("\n")}\nendbfchar`);
+  }
+
+  return [
+    "/CIDInit /ProcSet findresource begin",
+    "12 dict begin",
+    "begincmap",
+    "/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def",
+    "/CMapName /ProofFlowUnicode def",
+    "/CMapType 2 def",
+    "1 begincodespacerange",
+    "<0000> <FFFF>",
+    "endcodespacerange",
+    ...chunks,
+    "endcmap",
+    "CMapName currentdict /CMap defineresource pop",
+    "end",
+    "end",
+    ""
+  ].join("\n");
 }
 
 function pdfHexString(value) {
