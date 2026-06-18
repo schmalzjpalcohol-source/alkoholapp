@@ -54,8 +54,10 @@ function App() {
     const typeLabel = getTripTypeLabel(tripType);
     const baseName = `alcohol-check-${safeFilePart(name)}-${typeLabel}-${fileStamp}`;
     const reportPdf = await buildReportPdf(currentReportData, personPhoto, bacPhoto, `${baseName}.pdf`);
-    const personImage = renamePhotoFile(personPhoto, `${baseName}-separate-本人写真`);
-    const bacImage = renamePhotoFile(bacPhoto, `${baseName}-separate-検知器写真`);
+    const [personImage, bacImage] = await Promise.all([
+      compressPhotoFile(personPhoto, `${baseName}-person-photo`),
+      compressPhotoFile(bacPhoto, `${baseName}-bac-meter-photo`)
+    ]);
     return {
       data: currentReportData,
       files: [reportPdf, personImage, bacImage]
@@ -248,7 +250,7 @@ function App() {
                   {busy ? "準備中..." : "Outlookで送信"}
                 </button>
               </div>
-              <p className="attachment-note">別添付: PDF報告書 + separate本人写真 + separate検知器写真</p>
+              <p className="attachment-note">別添付: PDF報告書 + 本人写真 + 検知器写真</p>
             </section>
           )}
 
@@ -424,7 +426,7 @@ async function buildReportPdf(data, personPhoto, bacPhoto, fileName) {
   context.font = "400 20px -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif";
   context.fillText("PDFに加えて、メールには2枚の写真ファイルも別添付されています。", 72, 1648);
 
-  const jpegBytes = await canvasToJpegBytes(canvas, 0.72);
+  const jpegBytes = await canvasToJpegBytes(canvas, 0.62);
   const pdfBytes = createSingleImagePdf(jpegBytes, pageWidth, pageHeight);
   return new File([pdfBytes], fileName, { type: "application/pdf" });
 }
@@ -548,20 +550,35 @@ function totalLength(chunks) {
   return chunks.reduce((sum, chunk) => sum + chunk.length, 0);
 }
 
-function renamePhotoFile(file, baseName) {
-  const extension = getFileExtension(file.name) || imageExtensionFromType(file.type);
-  return new File([file], `${baseName}${extension}`, { type: file.type || "image/jpeg" });
+async function compressPhotoFile(file, baseName) {
+  const image = await loadImageFromFile(file);
+  const maxSide = 1280;
+  const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+  const width = Math.max(1, Math.round(image.width * scale));
+  const height = Math.max(1, Math.round(image.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  context.drawImage(image, 0, 0, width, height);
+  const blob = await canvasToBlob(canvas, "image/jpeg", 0.68);
+  return new File([blob], `${baseName}.jpg`, { type: "image/jpeg" });
 }
 
-function getFileExtension(fileName) {
-  const match = String(fileName).match(/\.[a-z0-9]+$/i);
-  return match ? match[0].toLowerCase() : "";
-}
-
-function imageExtensionFromType(type) {
-  if (type === "image/png") return ".png";
-  if (type === "image/webp") return ".webp";
-  return ".jpg";
+function canvasToBlob(canvas, type, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (blob) {
+          resolve(blob);
+        } else {
+          reject(new Error("Image compression failed"));
+        }
+      },
+      type,
+      quality
+    );
+  });
 }
 
 function getTripTypeLabel(value) {
