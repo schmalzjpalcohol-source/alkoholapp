@@ -1,6 +1,0 @@
-{
-  "ignore": ["data/*", "dist/*", "node_modules/*"],
-  "watch": ["server"],
-  "ext": "js,json"
-}
-
