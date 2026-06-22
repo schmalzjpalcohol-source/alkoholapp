@@ -412,8 +412,8 @@ function canvasToJpegBytes(canvas, quality) {
 }
 
 async function renderReportPage({ rows, personImage, bacImage, pageWidth, pageHeight }) {
-  // About 130 dpi: sharp enough for the report while staying much smaller than camera originals.
-  const renderScale = 1.8;
+  // About 112 dpi is sufficient for a one-page phone report and keeps photo data compact.
+  const renderScale = 1.55;
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(pageWidth * renderScale);
   canvas.height = Math.round(pageHeight * renderScale);
@@ -449,8 +449,12 @@ async function renderReportPage({ rows, personImage, bacImage, pageWidth, pageHe
     "#667879"
   );
 
+  let bytes = await canvasToJpegBytes(canvas, 0.62);
+  if (bytes.length > 500_000) bytes = await canvasToJpegBytes(canvas, 0.52);
+  if (bytes.length > 500_000) bytes = await canvasToJpegBytes(canvas, 0.44);
+
   return {
-    bytes: await canvasToJpegBytes(canvas, 0.76),
+    bytes,
     width: canvas.width,
     height: canvas.height
   };
